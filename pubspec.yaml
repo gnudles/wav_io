@@ -1,5 +1,5 @@
 name: wav_io
-description: A starting point for Dart libraries or applications.
+description: Wave audio files IO for dart
 version: 1.0.0
 repository: https://github.com/gnudles/wav_io
 
