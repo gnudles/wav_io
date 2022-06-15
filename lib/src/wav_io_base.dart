@@ -242,9 +242,9 @@ WavContent _parseWav(ByteData data) {
           for (int s = 0; s < samples; ++s) {
             for (int ch = 0; ch < numChannels; ++ch) {
               samplesForChannel[ch][s] =
-                  data.getInt16(currentDataOffset + 1, Endian.little) <<
-                      bitRounding + data.getUint8(currentDataOffset) >>
-                      (8 - bitRounding);
+                  (data.getInt16(currentDataOffset + 1, Endian.little) <<
+                      bitRounding) + (data.getUint8(currentDataOffset) >>
+                      (8 - bitRounding));
               currentDataOffset += 3;
             }
           }
