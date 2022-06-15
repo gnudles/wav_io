@@ -1,7 +1,7 @@
 name: wav_io
 description: A starting point for Dart libraries or applications.
-version: 1.0.0
-# homepage: https://www.example.com
+version: 0.1.0
+repository: https://github.com/gnudles/wav_io
 
 environment:
   sdk: '>=2.14.0 <3.0.0'

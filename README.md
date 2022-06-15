@@ -28,7 +28,7 @@ Add wav_io package to your pubspec.yaml file.
 
 ## Usage
 
-examples may be found in `/example` folder. 
+This example can be found in `/example` folder.
 
 ```dart
 
