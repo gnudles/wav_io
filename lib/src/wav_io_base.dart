@@ -1,12 +1,18 @@
-// TODO: Put public facing types in this file.
+
 
 import 'dart:typed_data';
 
 class WavContent {
+  /// The lists of samples per each audio channel
   final List<Int16List> samplesForChannel;
+  /// The number of audio channels
   final int numChannels;
+  /// The number of bits per sample in the loaded wav file.
+  /// The actual stored bits per sample cannot exceed 16 bits.
   final int bitsPerSample;
+  // Samples per second.
   final int sampleRate;
+  // Total number of samples in each channel. (This is not representing all the samples in all channels.)
   final int numSamples;
   WavContent(this.numChannels, this.sampleRate, this.bitsPerSample,
       this.numSamples, this.samplesForChannel) {
@@ -250,7 +256,7 @@ WavContent _parseWav(ByteData data) {
         for (int ch = 0; ch < numChannels; ++ch) {
           samplesForChannel[ch][s] =
               (data.getFloat32(currentDataOffset, Endian.little) * 32768)
-                  .toInt();
+                  .floor().clamp(-32768, 32767);
           currentDataOffset += 4;
         }
       }

@@ -18,25 +18,46 @@ Each channel is Int16List.
 
 ## Features
 
-* Can read 16bit & 24bit PCM files
+* Can read 16bit & 24bit PCM files.
 * Can read 32bit float files.
+* Can write to 16bit PCM file.
 
 ## Getting started
 
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
+Add wav_io package to your pubspec.yaml file.
 
 ## Usage
 
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder. 
+examples may be found in `/example` folder. 
 
 ```dart
-const like = 'sample';
+
+import 'dart:io';
+
+import 'package:wav_io/wav_io.dart';
+
+void main() {
+  var f = File("example/hello_float.wav").openSync(); 
+  var buf = f.readSync(f.lengthSync());
+  f.closeSync();
+  // loads
+  var wav = WavContent.fromBytes(buf.buffer.asByteData());
+
+  print(wav.numChannels);
+  print(wav.numSamples);
+  print(wav.sampleRate);
+  print(wav.bitsPerSample);
+  // actual samples store in wav.samplesForChannel
+  f = File("example/hello2.wav").openSync(mode: FileMode.writeOnly);
+  f.writeFromSync(wav.toBytes().buffer.asInt8List());
+  f.flushSync();
+  f.closeSync();
+}
+
 ```
 
 ## Additional information
 
-TODO: Tell users more about the package: where to find more information, how to 
-contribute to the package, how to file issues, what response they can expect 
-from the package authors, and more.
+WavContent stores each sample in 16 bit pcm format.
+
+
