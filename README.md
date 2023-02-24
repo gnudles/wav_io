@@ -14,7 +14,7 @@ and the Flutter guide for
 Simple reader and writer for WAVE files.
 
 It reads the ByteData of the contents, and create a list of channels.
-Each channel is Int16List.
+Each channel is packed as Int16List.
 
 ## Features
 
