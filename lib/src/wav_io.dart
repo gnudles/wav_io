@@ -428,23 +428,23 @@ Result<IWavSamplesStorage,WavParsingError> parseDataChunk(ByteData data, Endian 
   {
     return Result.error(WavParsingError.invalidDataChunkSize);
   }
-  if(wavFormat.formatType == StorageType.int16 && wavFormat.containerBitsPerSample == 16)
+  if(wavFormat.formatType == FormatType.pcm16 && wavFormat.containerBitsPerSample == 16)
   {
     return Result.ok(Int16Storage.fromBytes(wavFormat.numChannels, data, numEndianess));
   }
-  else if (wavFormat.formatType == StorageType.int32 && wavFormat.containerBitsPerSample==32)
+  else if (wavFormat.formatType == FormatType.pcm32 && wavFormat.containerBitsPerSample==32)
   {
     return Result.ok(Int32Storage.fromBytes32(wavFormat.numChannels, data, numEndianess));
   }
-  else if (wavFormat.formatType == StorageType.int32 && wavFormat.containerBitsPerSample==24)
+  else if (wavFormat.formatType == FormatType.pcm24 && wavFormat.containerBitsPerSample==24)
   {
     return Result.ok(Int32Storage.fromBytes24(wavFormat.numChannels, data, numEndianess));
   }
-  else if (wavFormat.formatType == StorageType.float32 && wavFormat.containerBitsPerSample==32)
+  else if (wavFormat.formatType == FormatType.float32 && wavFormat.containerBitsPerSample==32)
   {
     return Result.ok(Float32Storage.fromBytes(wavFormat.numChannels, data, numEndianess));
   }
-  else if (wavFormat.formatType == StorageType.float64 && wavFormat.containerBitsPerSample==64)
+  else if (wavFormat.formatType == FormatType.float64 && wavFormat.containerBitsPerSample==64)
   {
     return Result.ok(Float64Storage.fromBytes(wavFormat.numChannels, data, numEndianess));
   }

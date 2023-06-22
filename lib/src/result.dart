@@ -11,9 +11,9 @@ class Result<V, E> {
   void match(
       {required Function(V value) onOk, required Function(E error) onError}) {
     if (_kind == ResultKind.ok) {
-      onOk(_value!);
+      onOk(_value as V);
     } else {
-      onError(_error!);
+      onError(_error as E);
     }
   }
 
@@ -39,7 +39,7 @@ class ResultVE<V> {
   bool get isError => _kind == ResultKind.error;
   void match({required Function(V value) onOk, required Function() onError}) {
     if (_kind == ResultKind.ok) {
-      onOk(_value!);
+      onOk(_value as V);
     } else {
       onError();
     }

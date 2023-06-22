@@ -9,3 +9,7 @@
 ## 2.0.1
 
 - Small fixes
+
+## 2.0.2
+
+- Small fixes 
