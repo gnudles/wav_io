@@ -1,11 +1,7 @@
-import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:wav_io/wav_io.dart';
-
-import 'result.dart';
-import 'wav_samples_storage.dart';
 
 
 const SPEAKER_FRONT_LEFT =	0x1;

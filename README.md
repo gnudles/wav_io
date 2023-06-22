@@ -14,13 +14,14 @@ and the Flutter guide for
 Simple reader and writer for WAVE files.
 
 It reads the ByteData of the contents, and create a list of channels.
-Each channel is Int16List.
+Each channel is packed as Int16List/Int32List/Float32List/Float64List.
 
 ## Features
 
-* Can read 16bit & 24bit PCM files.
-* Can read 32bit float files.
-* Can write to 16bit PCM file.
+* Can read/write 16bit/24bit/32bit PCM files.
+* Can read/write 32bit/64bit float files.
+* Can read/write RIFX format (big endian version)
+* Can be used to write wav utilities.
 
 ## Getting started
 
@@ -28,36 +29,11 @@ Add wav_io package to your pubspec.yaml file.
 
 ## Usage
 
-This example can be found in `/example` folder.
-
-```dart
-
-import 'dart:io';
-
-import 'package:wav_io/wav_io.dart';
-
-void main() {
-  var f = File("example/hello_float.wav").openSync(); 
-  var buf = f.readSync(f.lengthSync());
-  f.closeSync();
-  // loads
-  var wav = WavContent.fromBytes(buf.buffer.asByteData());
-
-  print(wav.numChannels);
-  print(wav.numSamples);
-  print(wav.sampleRate);
-  print(wav.bitsPerSample);
-  // actual samples store in wav.samplesForChannel
-  f = File("example/hello2.wav").openSync(mode: FileMode.writeOnly);
-  f.writeFromSync(wav.toBytes().buffer.asInt8List());
-  f.flushSync();
-  f.closeSync();
-}
-
-```
+See examples in `/example` folder.
 
 ## Additional information
 
-WavContent stores each sample in 16 bit pcm format.
+Every file gets loaded, and samples data is stored in a suitable container.
+You can convert from one storage method to another (integer PCM to floats and vice versa).
 
 
