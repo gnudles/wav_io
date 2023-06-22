@@ -4,11 +4,18 @@ import 'dart:typed_data';
 import 'package:wav_io/src/byte_data_24bit.dart';
 
 
+enum FormatType {
+  pcm16,
+  pcm24,
+  pcm32,
+  float32,
+  float64
+}
 enum StorageType {
-  Int16,
-  Int32,
-  Float32,
-  Float64,
+  int16,
+  int32,
+  float32,
+  float64
 }
 
 
@@ -180,6 +187,8 @@ class Int16Storage extends IWavSamplesStorage {
     }
     return Int16Storage(samplesData, samplesPerChannel);
   }
+
+  @override
   void writeStorage(ByteData data, Endian numEndianess,int bytesPerSample)
   {
     if (bytesPerSample != 2) throw ArgumentError("Unexpected bytesPerSample");
@@ -198,20 +207,25 @@ class Int16Storage extends IWavSamplesStorage {
 
 
 
+  @override
   IWavSamplesStorage mixTogether(int totalLength, int numChannels, List<MixingInfo> mixInfo)
   {
     var samplesData = List.generate(numChannels, (index) => Int16List(totalLength));
     for (var m in mixInfo)
     {
       if (m.input is! Int16Storage)
+      {
         continue;
+      }
       for (var chm in m.channelMappings)
       {
         int actualLength = min(chm.length, totalLength - chm.offsetOutput);
         actualLength = min(actualLength, m.input.length - chm.offsetSource);
         int inChannelIndex = chm.fromChannel;
         if (inChannelIndex < 0)
+        {
           continue;
+        }
         var inputChannel = (m.input as Int16Storage).samplesData[inChannelIndex];
         var outputChannel = samplesData[chm.toChannel];
         double scale = chm.scale;
@@ -220,7 +234,9 @@ class Int16Storage extends IWavSamplesStorage {
           continue;
         }
         if (scale == 0)
+        {
           continue;
+        }
         if (scale == 1)
         {
           for (int s = 0; s< actualLength ;++s)
@@ -306,6 +322,7 @@ class Int32Storage extends IWavSamplesStorage {
     }
     return Int32Storage(samplesData, samplesPerChannel);
   }
+  @override
   void writeStorage(ByteData data, Endian numEndianess, int bytesPerSample)
   {
     int currentDataOffset = 0;
@@ -326,28 +343,34 @@ class Int32Storage extends IWavSamplesStorage {
       }
     }
     else
+    {
      throw ArgumentError("Unexpected bytesPerSample");
+    }
 
   }
 
   @override
   int get channels => samplesData.length;
 
-
+  @override
   IWavSamplesStorage mixTogether(int totalLength, int numChannels, List<MixingInfo> mixInfo)
   {
     var samplesData = List.generate(numChannels, (index) => Int32List(totalLength));
     for (var m in mixInfo)
     {
       if (m.input is! Int32Storage)
+      {
         continue;
+      }
       for (var chm in m.channelMappings)
       {
         int actualLength = min(chm.length, totalLength - chm.offsetOutput);
         actualLength = min(actualLength, m.input.length - chm.offsetSource);
         int inChannelIndex = chm.fromChannel;
         if (inChannelIndex < 0)
+        {
           continue;
+        }
         var inputChannel = (m.input as Int32Storage).samplesData[inChannelIndex];
         var outputChannel = samplesData[chm.toChannel];
         double scale = chm.scale;
@@ -356,7 +379,9 @@ class Int32Storage extends IWavSamplesStorage {
           continue;
         }
         if (scale == 0)
+        {
           continue;
+        }
         if (scale == 1)
         {
           for (int s = 0; s< actualLength ;++s)
@@ -401,6 +426,7 @@ class Int32Storage extends IWavSamplesStorage {
         (index) => IWavSamplesStorage._int32ListToFloat64(samplesData[index])), samplesPerChannel);
   }
 }
+
 class Float64Storage extends IWavSamplesStorage {
   final List<Float64List> samplesData;
 
@@ -426,6 +452,7 @@ class Float64Storage extends IWavSamplesStorage {
     return Float64Storage(samplesData, samplesPerChannel);
   }
 
+  @override
   void writeStorage(ByteData data, Endian numEndianess,int bytesPerSample)
   {
     if (bytesPerSample != 8) throw ArgumentError("Unexpected bytesPerSample");
@@ -442,26 +469,32 @@ class Float64Storage extends IWavSamplesStorage {
   int get channels => samplesData.length;
 
 
-
+  @override
   IWavSamplesStorage mixTogether(int totalLength, int numChannels, List<MixingInfo> mixInfo)
   {
     var samplesData = List.generate(numChannels, (index) => Float64List(totalLength));
     for (var m in mixInfo)
     {
       if (m.input is! Float64Storage)
+      {
         continue;
+      }
       for (var chm in m.channelMappings)
       {
         int actualLength = min(chm.length, totalLength - chm.offsetOutput);
         actualLength = min(actualLength, m.input.length - chm.offsetSource);
         int inChannelIndex = chm.fromChannel;
         if (inChannelIndex < 0)
+        {
           continue;
+        }
         var inputChannel = (m.input as Float64Storage).samplesData[inChannelIndex];
         var outputChannel = samplesData[chm.toChannel];
         double scale = chm.scale;
         if (scale == 0)
+        {
           continue;
+        }
         if (scale == 1)
         {
           for (int s = 0; s< actualLength ;++s)
@@ -531,7 +564,7 @@ class Float32Storage extends IWavSamplesStorage {
     }
     return Float32Storage(samplesData, samplesPerChannel);
   }
-  
+  @override
   void writeStorage(ByteData data, Endian numEndianess,int bytesPerSample)
   {
     if (bytesPerSample != 4) throw ArgumentError("Unexpected bytesPerSample");
@@ -548,26 +581,32 @@ class Float32Storage extends IWavSamplesStorage {
   int get channels => samplesData.length;
 
 
-
+  @override
   IWavSamplesStorage mixTogether(int totalLength, int numChannels, List<MixingInfo> mixInfo)
   {
     var samplesData = List.generate(numChannels, (index) => Float32List(totalLength));
     for (var m in mixInfo)
     {
       if (m.input is! Float32Storage)
+      {
         continue;
+      }
       for (var chm in m.channelMappings)
       {
         int actualLength = min(chm.length, totalLength - chm.offsetOutput);
         actualLength = min(actualLength, m.input.length - chm.offsetSource);
         int inChannelIndex = chm.fromChannel;
         if (inChannelIndex < 0)
+        {
           continue;
+        }
         var inputChannel = (m.input as Float32Storage).samplesData[inChannelIndex];
         var outputChannel = samplesData[chm.toChannel];
         double scale = chm.scale;
         if (scale == 0)
+        {
           continue;
+        }
         if (scale == 1)
         {
           for (int s = 0; s< actualLength ;++s)

@@ -1,3 +1,5 @@
+// ignore_for_file: non_constant_identifier_names, constant_identifier_names
+
 import 'dart:typed_data';
 import 'dart:convert';
 
@@ -8,56 +10,82 @@ import 'package:wav_io/src/result.dart';
 
 //these constants represent the string in Big-Endian.
 //Chunk id:
+
 const RIFF_ID = 0x52494646; // 0x52494646 == 'RIFF'
+
 const RIFX_ID = 0x52494658; // 0x52494646 == 'RIFX'
 // RIFF forms:
+
 const WAVE_ID = 0x57415645; // 0x57415645 == 'WAVE'
 
 // WAVE subchuncks:
+
 const fmt_ID = 0x666d7420; // 0x666d7420 == 'fmt '
+
 const data_ID = 0x64617461; // 0x64617461 == 'data'
+
 const fact_ID = 0x66616374; // 0x64617461 == 'fact'
+
 const cue_ID = 0x63756520; // 0x666d7420 == 'cue '
+
 const LIST_ID = 0x4c495354; // 0x4c495354 == 'LIST'
+
 const CSET_ID = 0x43534554; // 0x43534554 == 'CSET'
 
 //I haven't found information on the following, but audacity exports floats with
 //this chunk.
+
 const PEAK_ID = 0x5045414B; // 0x5045414B == 'PEAK'
 
 //List types:
+
 const INFO_ID = 0x494e464f; // 0x494e464f == 'INFO'
 
 //INFO entries:
+
 const INAM_ID = 0x494e414d; // Name (track title)
+
 const IPRD_ID = 0x49505244; // Product (album title)
+
 const IART_ID = 0x49415254; // Artist
+
 const ICMT_ID = 0x49434d54; // Comment
+
 const ICRD_ID = 0x49435244; // Creation Date (Year)
+
 const IGNR_ID = 0x49474e52; // genre
+
 const ITRK_ID = 0x4954524b; // track number
 
+
 const WAVE_FORMAT_PCM = 0x0001;
+
 const WAVE_FORMAT_ADPCM = 0x0002;
+
 const WAVE_FORMAT_IEEE_FLOAT = 0x0003;
+
 const WAVE_FORMAT_VSELP = 0x0004; /* Compaq Computer Corp. */
+
 const WAVE_FORMAT_IBM_CVSD = 0x0005; /* IBM Corporation */
+
 const WAVE_FORMAT_ALAW = 0x0006;
+
 const WAVE_FORMAT_MULAW = 0x0007;
+
 const WAVE_FORMAT_EXTENSIBLE = 0xFFFE;
 
 
 class GUID
 {
 
-  static Uint8List convert(int time_low, int time_mid, int time_hi_and_version, int clock_seq_hi_and_reserved, int cloc_seq_low, List<int> list)
+  static Uint8List convert(int timeLow, int timeMid, int timeHiAndVersion, int clockSeqHiAndReserved, int clocSeqLow, List<int> list)
   {
     ByteData data = ByteData(16);
-    data.setUint32(0, time_low, Endian.little);
-    data.setUint16(4, time_mid, Endian.little);
-    data.setUint16(6, time_hi_and_version, Endian.little);
-    data.setUint8(8, clock_seq_hi_and_reserved );
-    data.setUint8(9, cloc_seq_low );
+    data.setUint32(0, timeLow, Endian.little);
+    data.setUint16(4, timeMid, Endian.little);
+    data.setUint16(6, timeHiAndVersion, Endian.little);
+    data.setUint8(8, clockSeqHiAndReserved );
+    data.setUint8(9, clocSeqLow );
     data.setUint8(10, list[0]);
     data.setUint8(11, list[1]);
     data.setUint8(12, list[2]);
@@ -78,38 +106,42 @@ class GUID
     return true;
   }
 }
+
+
 final KSDATAFORMAT_SUBTYPE_PCM  =       GUID.convert(0x00000001,0x0000,0x0010,0x80,0x00,[0x00,0xaa,0x00,0x38,0x9b,0x71]);
 //"00000001-0000-0010-8000-00aa00389b71"
+
+
 final KSDATAFORMAT_SUBTYPE_IEEE_FLOAT  =   GUID.convert(0x00000003,0x0000,0x0010,0x80,0x00,[0x00,0xaa,0x00,0x38,0x9b,0x71]);
 //"00000003-0000-0010-8000-00aa00389b71"
 
 
 enum WavParsingError
 {
-  BufferIsTooSmall,
-  NotRiffChunk,
-  ChunkSizeExceedsBuffer,
-  RiffFormatIsNotWave,
-  SubChunkExceedsChunkSize,
-  ChunkSizeDontAlignWithSubChunks,
-  NoFmtSubChunk,
-  NoDataSubChunk,
-  InvalidFmtSizeForPCM,
-  InvalidFmtSizeForFloat,
-  InvalidFmtSizeForExtensible,
-  UnsupportedFormat,
-  InvalidSampleRate,
-  InvalidBitsPerSample,
-  UnsupportedBitsPerSample,
-  InvalidExtensionSize,
-  UnsupportedExtension,
-  InvalidChannelMask,
-  InvalidDataChunkSize,
-  InvalidListInfo,
-  UnrecognizedListType,
-  UnrecognizedCharFormat,
-  MultipleDataChunksNotSupported,
-  UnexpectedError
+  bufferIsTooSmall,
+  notRiffChunk,
+  chunkSizeExceedsBuffer,
+  riffFormatIsNotWave,
+  subChunkExceedsChunkSize,
+  chunkSizeDontAlignWithSubChunks,
+  noFmtSubChunk,
+  noDataSubChunk,
+  invalidFmtSizeForPCM,
+  invalidFmtSizeForFloat,
+  invalidFmtSizeForExtensible,
+  unsupportedFormat,
+  invalidSampleRate,
+  invalidBitsPerSample,
+  unsupportedBitsPerSample,
+  invalidExtensionSize,
+  unsupportedExtension,
+  invalidChannelMask,
+  invalidDataChunkSize,
+  invalidListInfo,
+  unrecognizedListType,
+  unrecognizedCharFormat,
+  multipleDataChunksNotSupported,
+  unexpectedError
 }
 
 class Chunk
@@ -129,11 +161,11 @@ Result<IWavContent,WavParsingError> loadWav(ByteData data)
 {
   
   if (data.lengthInBytes <= 44) {
-    return Result.error(WavParsingError.BufferIsTooSmall);
+    return Result.error(WavParsingError.bufferIsTooSmall);
   }
   int ckID = data.getUint32(0, Endian.big); //intent. big endian
   if (ckID != RIFF_ID && ckID != RIFX_ID) {
-    return Result.error(WavParsingError.NotRiffChunk);
+    return Result.error(WavParsingError.notRiffChunk);
   }
 
   Endian numEndianess = (ckID == RIFF_ID)?Endian.little:Endian.big;
@@ -141,12 +173,12 @@ Result<IWavContent,WavParsingError> loadWav(ByteData data)
   // ckSize may be odd, but a pad byte will be added to the data
   int ckSize = data.getUint32(4, numEndianess); 
   if (roundUp2(ckSize) + 8 > data.lengthInBytes) {
-    return Result.error(WavParsingError.ChunkSizeExceedsBuffer);
+    return Result.error(WavParsingError.chunkSizeExceedsBuffer);
   }
 
   int fmtId = data.getUint32(8, Endian.big);
   if (fmtId != WAVE_ID) {
-    return Result.error(WavParsingError.RiffFormatIsNotWave);
+    return Result.error(WavParsingError.riffFormatIsNotWave);
   }
   int overallSubChunks = 0; // starting after fmtId
   int subChunksTotalSize = ckSize - 4;
@@ -158,7 +190,7 @@ Result<IWavContent,WavParsingError> loadWav(ByteData data)
     overallSubChunks = roundUp2(overallSubChunks);
     if (subChunksTotalSize - overallSubChunks < 8)
     {
-      return Result.error(WavParsingError.ChunkSizeDontAlignWithSubChunks);
+      return Result.error(WavParsingError.chunkSizeDontAlignWithSubChunks);
     }
     int subCkId = data.getUint32(subChunksStart+overallSubChunks, Endian.big);
     overallSubChunks+=4;
@@ -166,13 +198,13 @@ Result<IWavContent,WavParsingError> loadWav(ByteData data)
     overallSubChunks+=4;
     if (subChunksTotalSize - overallSubChunks < subCkSize)
     {
-      return Result.error(WavParsingError.SubChunkExceedsChunkSize);
+      return Result.error(WavParsingError.subChunkExceedsChunkSize);
     }
     if (subCkId == data_ID)
     {
       if (metDataChunk)
       {
-        return Result.error(WavParsingError.MultipleDataChunksNotSupported);
+        return Result.error(WavParsingError.multipleDataChunksNotSupported);
       }
       metDataChunk = true;
     }
@@ -181,11 +213,11 @@ Result<IWavContent,WavParsingError> loadWav(ByteData data)
   }
   if (subChunksTotalSize != overallSubChunks)
   {
-    return Result.error(WavParsingError.ChunkSizeDontAlignWithSubChunks);
+    return Result.error(WavParsingError.chunkSizeDontAlignWithSubChunks);
   }
   if (metDataChunk == false)
   {
-    return Result.error(WavParsingError.NoDataSubChunk);
+    return Result.error(WavParsingError.noDataSubChunk);
   }
   late WavFormat wavFormat;
   
@@ -201,7 +233,7 @@ Result<IWavContent,WavParsingError> loadWav(ByteData data)
   }
   on StateError
   {
-    return Result.error(WavParsingError.NoFmtSubChunk);
+    return Result.error(WavParsingError.noFmtSubChunk);
   }
   late IWavSamplesStorage samplesStorage;
   //StorageType storageType = wavFormat.recommandedStorageType;
@@ -217,7 +249,7 @@ Result<IWavContent,WavParsingError> loadWav(ByteData data)
     samplesStorage = result.unwrap();
   }
 
-  ListInfo? listInfo = null;
+  ListInfo? listInfo;
   if (subChunks.every((sck) => sck.type != CSET_ID)) // we do not support INFO list other than Ascii encoded
   {
     try
@@ -230,7 +262,7 @@ Result<IWavContent,WavParsingError> loadWav(ByteData data)
       }
       else
       {
-        if (result.error != WavParsingError.UnrecognizedListType && result.error!= WavParsingError.UnrecognizedCharFormat)
+        if (result.error != WavParsingError.unrecognizedListType && result.error!= WavParsingError.unrecognizedCharFormat)
         {
           return Result.error(result.error);
         }
@@ -242,42 +274,54 @@ Result<IWavContent,WavParsingError> loadWav(ByteData data)
     }
   }
   IWavContent? output;
+  const formatToStorageConversion = 
+  [StorageType.int16,
+  StorageType.int32,
+  StorageType.int32,
+  StorageType.float32,
+  StorageType.float64];
   if (samplesStorage is Int16Storage)
   {
-    output = WavContent<Int16Storage>(wavFormat,wavFormat.recommandedStorageType, samplesStorage,info: listInfo);
+    output = WavContent<Int16Storage>(wavFormat,formatToStorageConversion[wavFormat.formatType.index], samplesStorage,info: listInfo);
   }
   else if (samplesStorage is Int32Storage)
   {
-    output = WavContent<Int32Storage>(wavFormat,wavFormat.recommandedStorageType, samplesStorage,info: listInfo);
+    output = WavContent<Int32Storage>(wavFormat,formatToStorageConversion[wavFormat.formatType.index], samplesStorage,info: listInfo);
   }
   else if (samplesStorage is Float32Storage)
   {
-    output = WavContent<Float32Storage>(wavFormat,wavFormat.recommandedStorageType, samplesStorage,info: listInfo);
+    output = WavContent<Float32Storage>(wavFormat,formatToStorageConversion[wavFormat.formatType.index], samplesStorage,info: listInfo);
   }
   else if (samplesStorage is Float64Storage)
   {
-    output = WavContent<Float64Storage>(wavFormat,wavFormat.recommandedStorageType, samplesStorage,info: listInfo);
+    output = WavContent<Float64Storage>(wavFormat,formatToStorageConversion[wavFormat.formatType.index], samplesStorage,info: listInfo);
   }
   if (output != null)
   {
     return Result.ok(output);
   }
-  return Result.error(WavParsingError.UnexpectedError);
+  return Result.error(WavParsingError.unexpectedError);
   
 }
-StorageType recommandedStorageType(int wFormatTag, int bitsPerSample)
+FormatType recommandedFormatType(int wFormatTag, int bitsPerSample)
 {
   if (wFormatTag == WAVE_FORMAT_PCM)
   {
-    if (bitsPerSample>16)
-      return StorageType.Int32;
-    return StorageType.Int16;
+    if (bitsPerSample==24)
+    {
+      return FormatType.pcm24;
+    }
+    else if (bitsPerSample==32)
+    {
+      return FormatType.pcm32;
+    }
+    return FormatType.pcm16;
   }
   if (bitsPerSample <= 32)
   {
-    return StorageType.Float32;
+    return FormatType.float32;
   }
-  return StorageType.Float64;
+  return FormatType.float64;
 }
 
 Result<WavFormat,WavParsingError> parseFmt(ByteData data, Endian numEndianess)
@@ -285,16 +329,16 @@ Result<WavFormat,WavParsingError> parseFmt(ByteData data, Endian numEndianess)
   int wFormatTag = data.getUint16(0, numEndianess);
   int wFormatTagActual = wFormatTag;
   if (wFormatTag != WAVE_FORMAT_PCM && wFormatTag != WAVE_FORMAT_IEEE_FLOAT &&  wFormatTag != WAVE_FORMAT_EXTENSIBLE) {
-    return Result.error(WavParsingError.UnsupportedFormat);
+    return Result.error(WavParsingError.unsupportedFormat);
   }
   if ((data.lengthInBytes != 16 && wFormatTag == WAVE_FORMAT_PCM)) {
-    return Result.error(WavParsingError.InvalidFmtSizeForPCM);
+    return Result.error(WavParsingError.invalidFmtSizeForPCM);
   }
   if (((data.lengthInBytes != 18 && data.lengthInBytes != 16) && wFormatTag == WAVE_FORMAT_IEEE_FLOAT)) {
-    return Result.error(WavParsingError.InvalidFmtSizeForFloat);
+    return Result.error(WavParsingError.invalidFmtSizeForFloat);
   }
   if ((data.lengthInBytes != 40 && wFormatTag == WAVE_FORMAT_EXTENSIBLE)) {
-    return Result.error(WavParsingError.InvalidFmtSizeForExtensible);
+    return Result.error(WavParsingError.invalidFmtSizeForExtensible);
   }
 
   int numChannels = data.getUint16(2, numEndianess);
@@ -314,15 +358,15 @@ Result<WavFormat,WavParsingError> parseFmt(ByteData data, Endian numEndianess)
 
   int sampleRate = data.getUint32(4, numEndianess);
   if (sampleRate == 0) {
-    return Result.error(WavParsingError.InvalidSampleRate);
+    return Result.error(WavParsingError.invalidSampleRate);
   }
   int byteRate = data.getUint32(8, numEndianess); // bytes per second
   int blockAlign = data.getUint16(12, numEndianess); //total bytes in all channels for a single sample.
 
   int bitsPerSample = data.getUint16(14, numEndianess);
   int validBitsPerSample = bitsPerSample;
-  if (bitsPerSample == 0) return Result.error(WavParsingError.InvalidBitsPerSample);
-  if (bitsPerSample <= 8) return Result.error(WavParsingError.UnsupportedBitsPerSample);
+  if (bitsPerSample == 0) return Result.error(WavParsingError.invalidBitsPerSample);
+  if (bitsPerSample <= 8) return Result.error(WavParsingError.unsupportedBitsPerSample);
   int bytesPerSample = blockAlign ~/ numChannels;
   int bytesPerSampleUp = (bitsPerSample + 7) ~/ 8;
   if (blockAlign % numChannels !=0) {
@@ -341,7 +385,7 @@ Result<WavFormat,WavParsingError> parseFmt(ByteData data, Endian numEndianess)
     int ckExtSize = data.getUint16(16, numEndianess); // should be 22 or 0
     if (ckExtSize + 18 != data.lengthInBytes)
     {
-      return Result.error(WavParsingError.InvalidExtensionSize);
+      return Result.error(WavParsingError.invalidExtensionSize);
     }
     if (wFormatTag == WAVE_FORMAT_EXTENSIBLE)
     {
@@ -358,22 +402,22 @@ Result<WavFormat,WavParsingError> parseFmt(ByteData data, Endian numEndianess)
         }
         else
         {
-          return Result.error(WavParsingError.UnsupportedExtension);
+          return Result.error(WavParsingError.unsupportedExtension);
         }
         if (channelMask!=0 && numChannels != countChannelsInMask(channelMask))
         {
-          return Result.error(WavParsingError.InvalidChannelMask);
+          return Result.error(WavParsingError.invalidChannelMask);
         }
     }
   }
   if (wFormatTagActual == WAVE_FORMAT_PCM && bitsPerSample > 32) {
-    return Result.error(WavParsingError.InvalidBitsPerSample);
+    return Result.error(WavParsingError.invalidBitsPerSample);
   }
   if (wFormatTagActual == WAVE_FORMAT_IEEE_FLOAT && (bitsPerSample != 32 && bitsPerSample != 64)) {
-    return Result.error(WavParsingError.InvalidBitsPerSample);
+    return Result.error(WavParsingError.invalidBitsPerSample);
   }
-  StorageType storageType = 
-                      recommandedStorageType(wFormatTagActual, bitsPerSample);
+  FormatType storageType = 
+                      recommandedFormatType(wFormatTagActual, bitsPerSample);
   return Result.ok(WavFormat(numChannels,sampleRate,blockAlign,
     validBitsPerSample,bytesPerSample*8,
     storageType,channelMask: channelMask));
@@ -382,29 +426,29 @@ Result<IWavSamplesStorage,WavParsingError> parseDataChunk(ByteData data, Endian 
 {
   if (data.lengthInBytes%wavFormat.blockAlign!=0)
   {
-    return Result.error(WavParsingError.InvalidDataChunkSize);
+    return Result.error(WavParsingError.invalidDataChunkSize);
   }
-  if(wavFormat.recommandedStorageType == StorageType.Int16 && wavFormat.containerBitsPerSample == 16)
+  if(wavFormat.formatType == StorageType.int16 && wavFormat.containerBitsPerSample == 16)
   {
     return Result.ok(Int16Storage.fromBytes(wavFormat.numChannels, data, numEndianess));
   }
-  else if (wavFormat.recommandedStorageType == StorageType.Int32 && wavFormat.containerBitsPerSample==32)
+  else if (wavFormat.formatType == StorageType.int32 && wavFormat.containerBitsPerSample==32)
   {
     return Result.ok(Int32Storage.fromBytes32(wavFormat.numChannels, data, numEndianess));
   }
-  else if (wavFormat.recommandedStorageType == StorageType.Int32 && wavFormat.containerBitsPerSample==24)
+  else if (wavFormat.formatType == StorageType.int32 && wavFormat.containerBitsPerSample==24)
   {
     return Result.ok(Int32Storage.fromBytes24(wavFormat.numChannels, data, numEndianess));
   }
-  else if (wavFormat.recommandedStorageType == StorageType.Float32 && wavFormat.containerBitsPerSample==32)
+  else if (wavFormat.formatType == StorageType.float32 && wavFormat.containerBitsPerSample==32)
   {
     return Result.ok(Float32Storage.fromBytes(wavFormat.numChannels, data, numEndianess));
   }
-  else if (wavFormat.recommandedStorageType == StorageType.Float64 && wavFormat.containerBitsPerSample==64)
+  else if (wavFormat.formatType == StorageType.float64 && wavFormat.containerBitsPerSample==64)
   {
     return Result.ok(Float64Storage.fromBytes(wavFormat.numChannels, data, numEndianess));
   }
-  return Result.error(WavParsingError.UnsupportedFormat);
+  return Result.error(WavParsingError.unsupportedFormat);
 }
 
 Result<ListInfo,WavParsingError> parseListChunk(ByteData data, Endian numEndianess)
@@ -412,7 +456,9 @@ Result<ListInfo,WavParsingError> parseListChunk(ByteData data, Endian numEndiane
   //Notice: We parse the strings as ascii characters, without regard to CSET Chunk
   int listType = data.getUint32(0, Endian.big);
   if (listType != INFO_ID)
-    return Result.error(WavParsingError.UnrecognizedListType);
+  {
+    return Result.error(WavParsingError.unrecognizedListType);
+  }
   int i = 4;
   Map<int,String> infoEntries = {};
   for (; i< data.lengthInBytes-8;)
@@ -422,7 +468,7 @@ Result<ListInfo,WavParsingError> parseListChunk(ByteData data, Endian numEndiane
     int length = data.getUint32(i+4, numEndianess);
     if (i+8+length > data.lengthInBytes)
     {
-      return Result.error(WavParsingError.InvalidListInfo);
+      return Result.error(WavParsingError.invalidListInfo);
     }
     i+=8;
 
@@ -433,7 +479,7 @@ Result<ListInfo,WavParsingError> parseListChunk(ByteData data, Endian numEndiane
     }
     on FormatException
     {
-      return Result.error(WavParsingError.UnrecognizedCharFormat);
+      return Result.error(WavParsingError.unrecognizedCharFormat);
     }
     i+=roundUp2(length);
   }
@@ -511,7 +557,10 @@ void writeFmt(ByteData data, bool extensible, WavFormat format, StorageType stor
   {
     wFormatTag = WAVE_FORMAT_EXTENSIBLE;
   }
-  else wFormatTag = (storageType == StorageType.Float32 || storageType == StorageType.Float64)?WAVE_FORMAT_IEEE_FLOAT:WAVE_FORMAT_PCM;
+  else 
+  {
+    wFormatTag = (storageType == StorageType.float32 || storageType == StorageType.float64)?WAVE_FORMAT_IEEE_FLOAT:WAVE_FORMAT_PCM;
+  }
   data.setUint16(0, wFormatTag, numEndianess);
   data.setUint16(2, format.numChannels, numEndianess);
   data.setUint32(4, format.sampleRate, numEndianess);
@@ -524,6 +573,6 @@ void writeFmt(ByteData data, bool extensible, WavFormat format, StorageType stor
     data.setUint16(16, 22, numEndianess);
     data.setUint16(18, format.validBitsPerSample, numEndianess);
     data.setUint32(20, format.channelMask, numEndianess);
-    data.buffer.asUint8List(data.offsetInBytes+24,16).setRange(0, 16, (storageType == StorageType.Float32 || storageType == StorageType.Float64)?KSDATAFORMAT_SUBTYPE_IEEE_FLOAT:KSDATAFORMAT_SUBTYPE_PCM);
+    data.buffer.asUint8List(data.offsetInBytes+24,16).setRange(0, 16, (storageType == StorageType.float32 || storageType == StorageType.float64)?KSDATAFORMAT_SUBTYPE_IEEE_FLOAT:KSDATAFORMAT_SUBTYPE_PCM);
   }
 }

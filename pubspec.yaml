@@ -1,6 +1,6 @@
 name: wav_io
-description: Wave audio files IO for dart
-version: 2.0.0
+description: RIFF-WAV audio file format handling in pure dart.
+version: 2.0.1
 repository: https://github.com/gnudles/wav_io
 
 environment:
@@ -14,5 +14,5 @@ dependencies:
 dev_dependencies:
   args: ^2.4.0
   test: ^1.16.0
-#  lints: ^1.0.0
+  lints: ^1.0.0
   

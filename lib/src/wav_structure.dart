@@ -3,36 +3,59 @@ import 'dart:typed_data';
 
 import 'package:wav_io/wav_io.dart';
 
-
+// ignore: constant_identifier_names
 const SPEAKER_FRONT_LEFT =	0x1;
+// ignore: constant_identifier_names
 const SPEAKER_FRONT_RIGHT =	0x2;
+// ignore: constant_identifier_names
 const SPEAKER_FRONT_CENTER = 0x4;
+// ignore: constant_identifier_names
 const SPEAKER_LOW_FREQUENCY =	0x8;
+// ignore: constant_identifier_names
 const SPEAKER_BACK_LEFT =	0x10;
+// ignore: constant_identifier_names
 const SPEAKER_BACK_RIGHT = 0x20;
+// ignore: constant_identifier_names
 const SPEAKER_FRONT_LEFT_OF_CENTER = 0x40;
+// ignore: constant_identifier_names
 const SPEAKER_FRONT_RIGHT_OF_CENTER = 0x80;
+// ignore: constant_identifier_names
 const SPEAKER_BACK_CENTER = 0x100;
+// ignore: constant_identifier_names
 const SPEAKER_SIDE_LEFT = 0x200;
+// ignore: constant_identifier_names
 const SPEAKER_SIDE_RIGHT = 0x400;
+// ignore: constant_identifier_names
 const SPEAKER_TOP_CENTER = 0x800;
+// ignore: constant_identifier_names
 const SPEAKER_TOP_FRONT_LEFT = 0x1000;
+// ignore: constant_identifier_names
 const SPEAKER_TOP_FRONT_CENTER = 0x2000;
+// ignore: constant_identifier_names
 const SPEAKER_TOP_FRONT_RIGHT = 0x4000;
+// ignore: constant_identifier_names
 const SPEAKER_TOP_BACK_LEFT = 0x8000;
+// ignore: constant_identifier_names
 const SPEAKER_TOP_BACK_CENTER = 0x10000;
+// ignore: constant_identifier_names
 const SPEAKER_TOP_BACK_RIGHT = 0x20000;
-
+// ignore: constant_identifier_names
 const KSAUDIO_SPEAKER_DIRECTOUT = 0x0;
+// ignore: constant_identifier_names
 const KSAUDIO_SPEAKER_MONO = SPEAKER_FRONT_CENTER;
+// ignore: constant_identifier_names
 const KSAUDIO_SPEAKER_STEREO = SPEAKER_FRONT_LEFT|SPEAKER_FRONT_RIGHT;
+// ignore: constant_identifier_names
 const KSAUDIO_SPEAKER_QUAD = SPEAKER_FRONT_LEFT|SPEAKER_FRONT_RIGHT|
                             SPEAKER_BACK_LEFT|SPEAKER_BACK_RIGHT;
+// ignore: constant_identifier_names
 const KSAUDIO_SPEAKER_SURROUND = SPEAKER_FRONT_LEFT|SPEAKER_FRONT_RIGHT|
                             SPEAKER_FRONT_CENTER|SPEAKER_BACK_CENTER;
+// ignore: constant_identifier_names
 const KSAUDIO_SPEAKER_5POINT1 = SPEAKER_FRONT_LEFT|SPEAKER_FRONT_RIGHT|
                             SPEAKER_FRONT_CENTER|SPEAKER_LOW_FREQUENCY|
                             SPEAKER_BACK_LEFT|SPEAKER_BACK_RIGHT;
+// ignore: constant_identifier_names
 const KSAUDIO_SPEAKER_5POINT1_SURROUND = SPEAKER_FRONT_LEFT|SPEAKER_FRONT_RIGHT|
                             SPEAKER_LOW_FREQUENCY|
                             SPEAKER_SIDE_LEFT|SPEAKER_SIDE_RIGHT;
@@ -89,7 +112,7 @@ int countChannelsInMask(int channelMask)
   return count;
 }
 
-List<T> createMappingOfMasks<T>(int oldMask, int newMask, T createMapping (int from, int to))
+List<T> createMappingOfMasks<T>(int oldMask, int newMask, T Function(int from, int to) createMapping)
 {
   int oldCount = 0;
   int newCount = 0;
@@ -126,7 +149,9 @@ class ListInfo
   {
     int s = [name,product,artist,date,comment,genre,trackNumber].fold<int>(0, (previousValue, element) => previousValue+(element.isNotEmpty && element.codeUnits.every((e) => e>0 && e <=127)?8+roundUp2(element.length+1):0));
     if (s>0)
+    {
       s+=4;//for INFO tag
+    }
     return s;
   }
   // write the info as the data of List info subchunk (not including the subchunk header)
@@ -173,31 +198,35 @@ class WavFormat
   int get channelMask => _channelMask;
   set channelMask(int channelMask){
     if (countChannelsInMask(channelMask)!=numChannels)
+    {
       throw ArgumentError("channelMask do not match the number of channels present");
+    }
     _channelMask = channelMask;
   }
-  final StorageType recommandedStorageType;
+  final FormatType formatType;
   WavFormat(this.numChannels, this.sampleRate, this.blockAlign, this.validBitsPerSample,this.containerBitsPerSample
-  ,this.recommandedStorageType,{int channelMask = 0}):_channelMask = channelMask;
+  ,this.formatType,{int channelMask = 0}):_channelMask = channelMask;
       
 }
 
 
 abstract class IWavContent
 {
-    // Total number of samples in each channel. (This is not representing total samples in all channels.)
+  /// Total number of samples in each channel. (This is not representing total samples in all channels.)
   int get numSamples => _samplesStorage.samplesPerChannel;
+  /// Number of channels
   int get numChannels => format.numChannels;
   int get sampleRate => format.sampleRate;
-  int get bitsPerSample => format.validBitsPerSample;
+  int get bitsPerSample => format.containerBitsPerSample;
+  ///Returns the duration of the Wav in seconds.
+  double get duration => _samplesStorage.samplesPerChannel/format.sampleRate;
 
-  double get durationSeconds => _samplesStorage.samplesPerChannel/format.sampleRate;
-
-  final WavFormat format;
+  final WavFormat _format;
+  WavFormat get format => _format;
   final StorageType storageType;
   final ListInfo? info;
   final IWavSamplesStorage _samplesStorage;
-  IWavContent(this.format, this.storageType, this._samplesStorage, {this.info});
+  IWavContent(this._format, this.storageType, this._samplesStorage, {this.info});
   IWavContent _cloneWith(IWavSamplesStorage? samplesStorage, WavFormat? format);
 
   IWavContent monoToStereo()
@@ -208,7 +237,7 @@ abstract class IWavContent
     }
     return _cloneWith(
     _samplesStorage.mixTogether(numSamples, 2, [MixingInfo(_samplesStorage,[ChannelMapping(0, 0, 0, numSamples, 0),ChannelMapping(0, 1, 0, numSamples, 0),])]),
-    WavFormat(2, sampleRate, 2*(format.containerBitsPerSample~/8), format.validBitsPerSample, format.containerBitsPerSample, format.recommandedStorageType, channelMask: SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT));
+    WavFormat(2, sampleRate, 2*(format.containerBitsPerSample~/8), format.validBitsPerSample, format.containerBitsPerSample, format.formatType, channelMask: SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT));
   }
   IWavContent stereoToMono()
   {
@@ -218,7 +247,7 @@ abstract class IWavContent
     }
     return _cloneWith(
     _samplesStorage.mixTogether(numSamples, 1, [MixingInfo(_samplesStorage,[ChannelMapping(0, 0, 0, numSamples, 0),ChannelMapping(1, 0, 0, numSamples, 0),])]),
-    WavFormat(1, sampleRate, (format.containerBitsPerSample~/8), format.validBitsPerSample, format.containerBitsPerSample, format.recommandedStorageType, channelMask: SPEAKER_FRONT_CENTER));
+    WavFormat(1, sampleRate, (format.containerBitsPerSample~/8), format.validBitsPerSample, format.containerBitsPerSample, format.formatType, channelMask: SPEAKER_FRONT_CENTER));
   }
   IWavContent toMono()
   {
@@ -226,15 +255,15 @@ abstract class IWavContent
     _samplesStorage.mixTogether(numSamples, 1, [MixingInfo(_samplesStorage,
     List.generate(numChannels, (index) => ChannelMapping(index, 0, 0, numSamples, 0))    
     )]),
-    WavFormat(1, sampleRate, (format.containerBitsPerSample~/8), format.validBitsPerSample, format.containerBitsPerSample, format.recommandedStorageType, channelMask: SPEAKER_FRONT_CENTER));
+    WavFormat(1, sampleRate, (format.containerBitsPerSample~/8), format.validBitsPerSample, format.containerBitsPerSample, format.formatType, channelMask: SPEAKER_FRONT_CENTER));
   }
   IWavContent append(IWavContent other)
   {
-    if (this.storageType != other.storageType)
+    if (storageType != other.storageType)
     {
       throw StateError("the appended section is not stored in the same format");
     }
-    if (this.sampleRate != other.sampleRate)
+    if (sampleRate != other.sampleRate)
     {
       throw StateError("the appended section has different sample rate");
     }
@@ -243,19 +272,19 @@ abstract class IWavContent
     {
       
       int outputChannelsMask = format.channelMask|other.format.channelMask;
-      int outputChannels = countChannelsInMask(outputChannelsMask);;
-      List<ChannelMapping> thisMapping = createMappingOfMasks(format.channelMask,outputChannelsMask, (from, to) => ChannelMapping(from,to,0,this.numSamples,0));
-      List<ChannelMapping> otherMapping = createMappingOfMasks(other.format.channelMask,outputChannelsMask, (from, to) => ChannelMapping(from,to,0,other.numSamples,this.numSamples));
-      int newValidBits = min(format.containerBitsPerSample,max(this.format.validBitsPerSample,other.format.validBitsPerSample));
+      int outputChannels = countChannelsInMask(outputChannelsMask);
+      List<ChannelMapping> thisMapping = createMappingOfMasks(format.channelMask,outputChannelsMask, (from, to) => ChannelMapping(from,to,0,numSamples,0));
+      List<ChannelMapping> otherMapping = createMappingOfMasks(other.format.channelMask,outputChannelsMask, (from, to) => ChannelMapping(from,to,0,other.numSamples,numSamples));
+      int newValidBits = min(format.containerBitsPerSample,max(format.validBitsPerSample,other.format.validBitsPerSample));
       return _cloneWith(
-    _samplesStorage.mixTogether(this.numSamples+other.numSamples, outputChannels, [MixingInfo(_samplesStorage,
+    _samplesStorage.mixTogether(numSamples+other.numSamples, outputChannels, [MixingInfo(_samplesStorage,
        thisMapping
     ),MixingInfo(other._samplesStorage,
        otherMapping
     )])
     ,
     WavFormat(outputChannels, sampleRate, outputChannels* (format.containerBitsPerSample~/8), newValidBits,
-     format.containerBitsPerSample, format.recommandedStorageType,channelMask: outputChannelsMask));
+     format.containerBitsPerSample, format.formatType,channelMask: outputChannelsMask));
     }
 
     throw StateError("channels mapping mismatch. try to append manually");
@@ -267,42 +296,42 @@ abstract class IWavContent
   {
     _samplesStorage.writeStorage(data, numEndianess, format.containerBitsPerSample~/8);
   }
-  WavContent<Int16Storage> toInt16()
+  WavContent<Int16Storage> toPcm16()
   {
-    return WavContent<Int16Storage>(WavFormat(format.numChannels,format.sampleRate,2*format.numChannels,16,16,StorageType.Int16,channelMask: format.channelMask),
-    StorageType.Int16,_samplesStorage.convertToInt16(),info: info);
+    return WavContent<Int16Storage>(WavFormat(format.numChannels,format.sampleRate,2*format.numChannels,16,16,FormatType.pcm16,channelMask: format.channelMask),
+    StorageType.int16,_samplesStorage.convertToInt16(),info: info);
   }
-  WavContent<Int32Storage> toInt24()
+  WavContent<Int32Storage> toPcm24()
   {
-    return WavContent<Int32Storage>(WavFormat(format.numChannels,format.sampleRate,3*format.numChannels,24,24,StorageType.Int32,channelMask: format.channelMask),
-    StorageType.Int32,_samplesStorage.convertToInt32(),info: info);
+    return WavContent<Int32Storage>(WavFormat(format.numChannels,format.sampleRate,3*format.numChannels,24,24,FormatType.pcm24,channelMask: format.channelMask),
+    StorageType.int32,_samplesStorage.convertToInt32(),info: info);
   }
-  WavContent<Int32Storage> toInt32()
+  WavContent<Int32Storage> toPcm32()
   {
-    return WavContent<Int32Storage>(WavFormat(format.numChannels,format.sampleRate,4*format.numChannels,32,32,StorageType.Int32,channelMask: format.channelMask),
-    StorageType.Int32,_samplesStorage.convertToInt32(),info: info);
+    return WavContent<Int32Storage>(WavFormat(format.numChannels,format.sampleRate,4*format.numChannels,32,32,FormatType.pcm32,channelMask: format.channelMask),
+    StorageType.int32,_samplesStorage.convertToInt32(),info: info);
   }
 
   WavContent<Float32Storage> toFloat32()
   {
-    return WavContent<Float32Storage>(WavFormat(format.numChannels,format.sampleRate,4*format.numChannels,24,32,StorageType.Float32,channelMask: format.channelMask),
-    StorageType.Float32,_samplesStorage.convertToFloat32(),info: info);
+    return WavContent<Float32Storage>(WavFormat(format.numChannels,format.sampleRate,4*format.numChannels,24,32,FormatType.float32,channelMask: format.channelMask),
+    StorageType.float32,_samplesStorage.convertToFloat32(),info: info);
   }
   WavContent<Float64Storage> toFloat64()
   {
-    return WavContent<Float64Storage>(WavFormat(format.numChannels,format.sampleRate,8*format.numChannels,53,64,StorageType.Float64,channelMask: format.channelMask),
-    StorageType.Float64,_samplesStorage.convertToFloat64(),info: info);
+    return WavContent<Float64Storage>(WavFormat(format.numChannels,format.sampleRate,8*format.numChannels,53,64,FormatType.float64,channelMask: format.channelMask),
+    StorageType.float64,_samplesStorage.convertToFloat64(),info: info);
   }
   IWavContent to(String format)
   {
     switch (format)
     {
       case 'i16':
-      return toInt16();
+      return toPcm16();
       case 'i24':
-      return toInt24();
+      return toPcm24();
       case 'i32':
-      return toInt32();
+      return toPcm32();
       case 'f32':
       return toFloat32();
       case 'f64':
@@ -310,16 +339,32 @@ abstract class IWavContent
     }
     throw ArgumentError("unrecognized format string. should be one of i16|i24|i32|f32|f64");
   }
+  IWavContent toFormat(FormatType formatType)
+  {
+    switch (formatType)
+    {
+      case FormatType.pcm16:
+      return toPcm16();
+      case FormatType.pcm24:
+      return toPcm24();
+      case FormatType.pcm32:
+      return toPcm32();
+      case FormatType.float32:
+      return toFloat32();
+      case FormatType.float64:
+      return toFloat64();
+    }
+  }
 }
 
 
 class WavContent<T extends IWavSamplesStorage> extends IWavContent{
   /// The lists of samples per each audio channel
   T get samplesStorage => _samplesStorage as T;
-  static const _storageTypeCheck= <StorageType,Type>{StorageType.Int16 :Int16Storage,
-  StorageType.Int32 :Int32Storage,
-  StorageType.Float32 :Float32Storage,
-  StorageType.Float64 :Float64Storage};
+  static const _storageTypeCheck= <StorageType,Type>{StorageType.int16 :Int16Storage,
+  StorageType.int32 :Int32Storage,
+  StorageType.float32 :Float32Storage,
+  StorageType.float64 :Float64Storage};
   WavContent(super.format, super.storageType, super._samplesStorage,{super.info})
   {
     if (T != _storageTypeCheck[storageType])
@@ -331,9 +376,11 @@ class WavContent<T extends IWavSamplesStorage> extends IWavContent{
       throw ArgumentError("numChannels in format, do not match numChannels in storage");
     }
   }
+
+  @override
   IWavContent _cloneWith(IWavSamplesStorage? samplesStorage, WavFormat? format)
   {
-    return WavContent<T>(format??this.format,storageType,samplesStorage??this._samplesStorage, info: info);
+    return WavContent<T>(format??_format,storageType,samplesStorage??_samplesStorage, info: info);
   }
 }
 

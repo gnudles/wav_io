@@ -16,11 +16,11 @@ extension ByteData24Bit on ByteData
   {
     if (endian == Endian.big)
     {
-      return (this.getInt16(byteOffset,Endian.big)<<8)|this.getUint8(byteOffset+2);
+      return (getInt16(byteOffset,Endian.big)<<8)|getUint8(byteOffset+2);
     }
     else
     {
-      return this.getUint16(byteOffset,Endian.little)|(this.getInt8(byteOffset+2)<<16);
+      return getUint16(byteOffset,Endian.little)|(getInt8(byteOffset+2)<<16);
     }
   }
   /// Returns the positive integer represented by the three bytes at
@@ -36,11 +36,11 @@ extension ByteData24Bit on ByteData
   {
     if (endian == Endian.big)
     {
-      return (this.getUint16(byteOffset,Endian.big)<<8)|this.getUint8(byteOffset+2);
+      return (getUint16(byteOffset,Endian.big)<<8)|getUint8(byteOffset+2);
     }
     else
     {
-      return this.getUint16(byteOffset,Endian.little)|(this.getUint8(byteOffset+2)<<16);
+      return getUint16(byteOffset,Endian.little)|(getUint8(byteOffset+2)<<16);
     }
   }
   /// Sets the three bytes starting at the specified [byteOffset] in this
@@ -56,13 +56,13 @@ extension ByteData24Bit on ByteData
   {
     if (endian == Endian.big)
     {
-      this.setInt16(byteOffset, value>>8);
-      this.setUint8(byteOffset+2, value&0xff);
+      setInt16(byteOffset, value>>8);
+      setUint8(byteOffset+2, value&0xff);
     }
     else
     {
-      this.setUint16(byteOffset, value&0xffff);
-      this.setInt8(byteOffset+2, value>>16);
+      setUint16(byteOffset, value&0xffff);
+      setInt8(byteOffset+2, value>>16);
     }
   }
 
@@ -80,13 +80,13 @@ extension ByteData24Bit on ByteData
   {
     if (endian == Endian.big)
     {
-      this.setUint16(byteOffset, value>>8);
-      this.setUint8(byteOffset+2, value&0xff);
+      setUint16(byteOffset, value>>8);
+      setUint8(byteOffset+2, value&0xff);
     }
     else
     {
-      this.setUint16(byteOffset, value&0xffff);
-      this.setUint8(byteOffset+2, value>>16);
+      setUint16(byteOffset, value&0xffff);
+      setUint8(byteOffset+2, value>>16);
     }
   }
 }

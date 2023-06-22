@@ -22,22 +22,22 @@ void main() {
     });
   });
   group('wav_io load stereo float and 24bit pcm', () {
-    var wav_float = loadFile("test/float32_stereo.wav") as WavContent<Float32Storage>;
-    var wav_24bit = loadFile("test/24bit_stereo.wav") as WavContent<Int32Storage>;
+    var wavFloat = loadFile("test/float32_stereo.wav") as WavContent<Float32Storage>;
+    var wav24bit = loadFile("test/24bit_stereo.wav") as WavContent<Int32Storage>;
 
     setUp(() {});
 
     test('test variables float', () {
-      expect(wav_float.numChannels == 2, isTrue);
-      expect(wav_float.bitsPerSample == 32, isTrue);
-      expect(wav_float.sampleRate == 44100, isTrue);
-      expect(wav_float.numSamples == 113, isTrue);
+      expect(wavFloat.numChannels == 2, isTrue);
+      expect(wavFloat.bitsPerSample == 32, isTrue);
+      expect(wavFloat.sampleRate == 44100, isTrue);
+      expect(wavFloat.numSamples == 113, isTrue);
     });
     test('test variables 24bit', () {
-      expect(wav_24bit.numChannels == 2, isTrue);
-      expect(wav_24bit.bitsPerSample == 24, isTrue);
-      expect(wav_24bit.sampleRate == 44100, isTrue);
-      expect(wav_24bit.numSamples == 113, isTrue);
+      expect(wav24bit.numChannels == 2, isTrue);
+      expect(wav24bit.bitsPerSample == 24, isTrue);
+      expect(wav24bit.sampleRate == 44100, isTrue);
+      expect(wav24bit.numSamples == 113, isTrue);
     });
     
   });
