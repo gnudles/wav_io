@@ -1,6 +1,6 @@
 name: wav_io
 description: RIFF-WAV audio file format handling and manipulation written in pure dart.
-version: 2.0.2
+version: 2.0.3
 repository: https://github.com/gnudles/wav_io
 
 environment:

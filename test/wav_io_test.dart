@@ -22,8 +22,10 @@ void main() {
     });
   });
   group('wav_io load stereo float and 24bit pcm', () {
-    var wavFloat = loadFile("test/float32_stereo.wav") as WavContent<Float32Storage>;
-    var wav24bit = loadFile("test/24bit_stereo.wav") as WavContent<Int32Storage>;
+    var wavFloat =
+        loadFile("test/float32_stereo.wav") as WavContent<Float32Storage>;
+    var wav24bit =
+        loadFile("test/24bit_stereo.wav") as WavContent<Int32Storage>;
 
     setUp(() {});
 
@@ -39,6 +41,5 @@ void main() {
       expect(wav24bit.sampleRate == 44100, isTrue);
       expect(wav24bit.numSamples == 113, isTrue);
     });
-    
   });
 }

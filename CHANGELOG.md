@@ -13,3 +13,8 @@
 ## 2.0.2
 
 - Small fixes 
+
+## 2.0.3
+
+- Formatting
+- added README to examples folder
