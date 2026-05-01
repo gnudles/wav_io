@@ -61,8 +61,9 @@ abstract class IWavSamplesStorage {
   static Float32List _int16ListToFloat32(Int16List list) {
     var fl = Float32List(list.length);
     int length = list.length;
+    final double multiplier = 1 / (1 << 15);
     for (int i = 0; i < length; ++i) {
-      fl[i] = list[i] * (1 / (1 << 15));
+      fl[i] = list[i] * multiplier;
     }
     return fl;
   }
@@ -70,8 +71,9 @@ abstract class IWavSamplesStorage {
   static Float64List _int16ListToFloat64(Int16List list) {
     var fl = Float64List(list.length);
     int length = list.length;
+    final double multiplier = 1 / (1 << 15);
     for (int i = 0; i < length; ++i) {
-      fl[i] = list[i] * (1 / (1 << 15));
+      fl[i] = list[i] * multiplier;
     }
     return fl;
   }
@@ -79,8 +81,9 @@ abstract class IWavSamplesStorage {
   static Float32List _int32ListToFloat32(Int32List list) {
     var fl = Float32List(list.length);
     int length = list.length;
+    final double multiplier = 1 / (1 << 31);
     for (int i = 0; i < length; ++i) {
-      fl[i] = list[i] * (1 / (1 << 31));
+      fl[i] = list[i] * multiplier;
     }
     return fl;
   }
@@ -88,8 +91,9 @@ abstract class IWavSamplesStorage {
   static Float64List _int32ListToFloat64(Int32List list) {
     var fl = Float64List(list.length);
     int length = list.length;
+    final double multiplier = 1 / (1 << 31);
     for (int i = 0; i < length; ++i) {
-      fl[i] = list[i] * (1 / (1 << 31));
+      fl[i] = list[i] * multiplier;
     }
     return fl;
   }
