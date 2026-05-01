@@ -22,12 +22,12 @@ class Result<V, E> {
   }
 
   V unwrap() {
-    if (_kind != ResultKind.ok) throw UnsupportedError;
+    if (_kind != ResultKind.ok) throw UnsupportedError("Result is not Ok");
     return _value!;
   }
 
   E? get error {
-    if (_kind != ResultKind.error) throw UnsupportedError;
+    if (_kind != ResultKind.error) throw UnsupportedError("Result is not Error");
     return _error;
   }
 }
@@ -51,7 +51,7 @@ class ResultVE<V> {
   }
 
   V unwrap() {
-    if (_kind == ResultKind.error) throw UnsupportedError;
+    if (_kind == ResultKind.error) throw UnsupportedError("ResultVE is Error");
     return _value!;
   }
 }
