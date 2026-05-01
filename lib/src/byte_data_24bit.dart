@@ -49,10 +49,10 @@ extension ByteData24Bit on ByteData {
   /// `byteOffset + 3` must be less than or equal to the length of this object.
   void setInt24(int byteOffset, int value, [Endian endian = Endian.big]) {
     if (endian == Endian.big) {
-      setInt16(byteOffset, value >> 8);
+      setInt16(byteOffset, value >> 8, Endian.big);
       setUint8(byteOffset + 2, value & 0xff);
     } else {
-      setUint16(byteOffset, value & 0xffff);
+      setUint16(byteOffset, value & 0xffff, Endian.little);
       setInt8(byteOffset + 2, value >> 16);
     }
   }
@@ -68,10 +68,10 @@ extension ByteData24Bit on ByteData {
   /// `byteOffset + 3` must be less than or equal to the length of this object.
   void setUint24(int byteOffset, int value, [Endian endian = Endian.big]) {
     if (endian == Endian.big) {
-      setUint16(byteOffset, value >> 8);
+      setUint16(byteOffset, value >> 8, Endian.big);
       setUint8(byteOffset + 2, value & 0xff);
     } else {
-      setUint16(byteOffset, value & 0xffff);
+      setUint16(byteOffset, value & 0xffff, Endian.little);
       setUint8(byteOffset + 2, value >> 16);
     }
   }
