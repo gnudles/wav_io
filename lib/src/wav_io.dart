@@ -340,12 +340,10 @@ Result<WavFormat, WavParsingError> parseFmt(
 
   int bitsPerSample = data.getUint16(14, numEndianess);
   int validBitsPerSample = bitsPerSample;
-  if (bitsPerSample == 0)
-  {
+  if (bitsPerSample == 0) {
     return Result.error(WavParsingError.invalidBitsPerSample);
   }
-  if (bitsPerSample <= 8)
-  {
+  if (bitsPerSample <= 8) {
     return Result.error(WavParsingError.unsupportedBitsPerSample);
   }
   int bytesPerSample = blockAlign ~/ numChannels;
@@ -461,6 +459,52 @@ Result<ListInfo, WavParsingError> parseListChunk(
       infoEntries[ITRK_ID] ?? ""));
 }
 
+ByteData writeWavHeader(
+    WavFormat format, StorageType storageType, int numSamples,
+    {ListInfo? info, bool extensible = true, bool bigEndian = false}) {
+  int dataCkSize = format.blockAlign * numSamples;
+  int listCkSize = info?.sizeOnDisk ?? 0;
+
+  const fmtExCkSize = 40;
+  const fmtSimpleCkSize = 16;
+  int fmtSize = extensible ? fmtExCkSize : fmtSimpleCkSize;
+  const factCkSize = 4;
+  int ckSize = 4 + (fmtSize + 8) + (factCkSize + 8) + (dataCkSize + 8);
+  if (listCkSize > 0) {
+    ckSize = roundUp2(ckSize) + listCkSize + 8;
+  }
+  int headerSize = 20 + fmtSize + 12 + 8;
+
+  var data = ByteData(headerSize);
+
+  Endian numEndianess = bigEndian ? Endian.big : Endian.little;
+  data.setUint32(0, bigEndian ? RIFX_ID : RIFF_ID, Endian.big);
+  data.setUint32(4, ckSize, numEndianess);
+  data.setUint32(8, WAVE_ID, Endian.big);
+  data.setUint32(12, fmt_ID, Endian.big);
+
+  data.setUint32(16, fmtSize, numEndianess);
+  writeFmt(data.buffer.asByteData(20, fmtSize), extensible, format, storageType,
+      numEndianess);
+  int position = 20 + fmtSize;
+  //write Fact
+  {
+    data.setUint32(position, fact_ID, Endian.big);
+    data.setUint32(position + 4, factCkSize, numEndianess);
+    data.setUint32(position + 8, numSamples, numEndianess);
+    position += 12;
+  }
+
+  {
+    // write data chunk header
+    data.setUint32(position, data_ID, Endian.big);
+    data.setUint32(position + 4, dataCkSize, numEndianess);
+    position += 8;
+  }
+
+  return data;
+}
+
 ByteData saveWav(IWavContent wavContent,
     [bool extensible = true, bool bigEndian = false]) {
   int dataCkSize = wavContent.format.blockAlign * wavContent.numSamples;
@@ -478,34 +522,24 @@ ByteData saveWav(IWavContent wavContent,
 
   var data = ByteData(totalFileSize);
 
+  // Write header using our new writeWavHeader
+  var header = writeWavHeader(
+      wavContent.format, wavContent.storageType, wavContent.numSamples,
+      info: wavContent.info, extensible: extensible, bigEndian: bigEndian);
+
+  data.buffer
+      .asUint8List()
+      .setRange(0, header.lengthInBytes, header.buffer.asUint8List());
+
   Endian numEndianess = bigEndian ? Endian.big : Endian.little;
-  data.setUint32(0, bigEndian ? RIFX_ID : RIFF_ID, Endian.big);
-  data.setUint32(4, ckSize, numEndianess);
-  data.setUint32(8, WAVE_ID, Endian.big);
-  data.setUint32(12, fmt_ID, Endian.big);
+  int position = header.lengthInBytes;
 
-  data.setUint32(16, fmtSize, numEndianess);
-  writeFmt(data.buffer.asByteData(20, fmtSize), extensible, wavContent.format,
-      wavContent.storageType, numEndianess);
-  int position = 20 + fmtSize;
-  //write Fact
-  {
-    data.setUint32(position, fact_ID, Endian.big);
-    data.setUint32(position + 4, factCkSize, numEndianess);
-    data.setUint32(position + 8, wavContent.numSamples, numEndianess);
-    position += 12;
-  }
+  // write data content
+  wavContent.exportStorageAsBytes(
+      data.buffer.asByteData(data.offsetInBytes + position, dataCkSize),
+      numEndianess);
+  position += roundUp2(dataCkSize);
 
-  {
-    // write data
-    data.setUint32(position, data_ID, Endian.big);
-    data.setUint32(position + 4, dataCkSize, numEndianess);
-    position += 8;
-    wavContent.exportStorageAsBytes(
-        data.buffer.asByteData(data.offsetInBytes + position, dataCkSize),
-        numEndianess);
-    position += roundUp2(dataCkSize);
-  }
   // write list info
   if (listCkSize > 0) {
     data.setUint32(position, LIST_ID, Endian.big);
