@@ -38,6 +38,14 @@ abstract class IWavSamplesStorage {
   Int16Storage convertToInt16();
   Int32Storage convertToInt32();
   Uint8Storage convertToUint8();
+
+  /// Mixes samples from the provided `mixInfo` list into a newly allocated
+  /// storage block of `totalLength` and `numChannels`.
+  /// It expects `mixInfo` to describe how different input channels are mapped,
+  /// offset, scaled, and added into the resulting storage's channels.
+  /// It silently ignores mapping entries with scales that are completely out of
+  /// range or extremely close to zero, channels that are out of bounds, and input
+  /// storage types that do not match the expected underlying type.
   IWavSamplesStorage mixTogether(
       int totalLength, int numChannels, List<MixingInfo> mixInfo);
   void writeStorage(ByteData data, Endian numEndianess, int bytesPerSample);
@@ -291,7 +299,7 @@ class Uint8Storage extends IWavSamplesStorage {
             (m.input as Uint8Storage).samplesData[inChannelIndex];
         var outputChannel = samplesData[chm.toChannel];
         double scale = chm.scale;
-        if (scale.abs() > 16383 || scale.abs() < 0.000061035) {
+        if (scale.abs() > 128 || scale.abs() < (1 / 128)) {
           continue;
         }
         if (scale == 0) {
@@ -425,7 +433,7 @@ class Int16Storage extends IWavSamplesStorage {
             (m.input as Int16Storage).samplesData[inChannelIndex];
         var outputChannel = samplesData[chm.toChannel];
         double scale = chm.scale;
-        if (scale.abs() > 16383 || scale.abs() < 0.000061035) {
+        if (scale.abs() > 32768 || scale.abs() < (1 / 32768)) {
           continue;
         }
         if (scale == 0) {
@@ -585,7 +593,7 @@ class Int32Storage extends IWavSamplesStorage {
             (m.input as Int32Storage).samplesData[inChannelIndex];
         var outputChannel = samplesData[chm.toChannel];
         double scale = chm.scale;
-        if (scale.abs() > 16383 || scale.abs() < 0.000061035) {
+        if (scale.abs() > pow(2, 31) || scale.abs() < pow(2, -31)) {
           continue;
         }
         if (scale == 0) {
