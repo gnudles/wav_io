@@ -3,9 +3,9 @@ import 'dart:typed_data';
 
 import 'package:wav_io/src/byte_data_24bit.dart';
 
-enum FormatType { pcm16, pcm24, pcm32, float32, float64 }
+enum FormatType { pcm8, pcm16, pcm24, pcm32, float32, float64 }
 
-enum StorageType { int16, int32, float32, float64 }
+enum StorageType { uint8, int16, int32, float32, float64 }
 
 class ChannelMapping {
   int fromChannel;
@@ -37,6 +37,7 @@ abstract class IWavSamplesStorage {
   Float64Storage convertToFloat64();
   Int16Storage convertToInt16();
   Int32Storage convertToInt32();
+  Uint8Storage convertToUint8();
   IWavSamplesStorage mixTogether(
       int totalLength, int numChannels, List<MixingInfo> mixInfo);
   void writeStorage(ByteData data, Endian numEndianess, int bytesPerSample);
@@ -150,6 +151,219 @@ abstract class IWavSamplesStorage {
       i32[i] = (list[i] * 2147483648).floor().clamp(-2147483648, 2147483647);
     }
     return i32;
+  }
+
+  static Float32List _uint8ListToFloat32(Uint8List list) {
+    var fl = Float32List(list.length);
+    int length = list.length;
+    final double multiplier = 1 / 128.0;
+    for (int i = 0; i < length; ++i) {
+      fl[i] = (list[i] - 128) * multiplier;
+    }
+    return fl;
+  }
+
+  static Float64List _uint8ListToFloat64(Uint8List list) {
+    var fl = Float64List(list.length);
+    int length = list.length;
+    final double multiplier = 1 / 128.0;
+    for (int i = 0; i < length; ++i) {
+      fl[i] = (list[i] - 128) * multiplier;
+    }
+    return fl;
+  }
+
+  static Int16List _uint8ListToInt16(Uint8List list) {
+    var i16 = Int16List(list.length);
+    int length = list.length;
+    for (int i = 0; i < length; ++i) {
+      i16[i] = (list[i] - 128) << 8;
+    }
+    return i16;
+  }
+
+  static Int32List _uint8ListToInt32(Uint8List list) {
+    var i32 = Int32List(list.length);
+    int length = list.length;
+    for (int i = 0; i < length; ++i) {
+      i32[i] = (list[i] - 128) << 24;
+    }
+    return i32;
+  }
+
+  static Uint8List _int16ListToUint8(Int16List list) {
+    var u8 = Uint8List(list.length);
+    int length = list.length;
+    for (int i = 0; i < length; ++i) {
+      u8[i] = (list[i] >> 8) + 128;
+    }
+    return u8;
+  }
+
+  static Uint8List _int32ListToUint8(Int32List list) {
+    var u8 = Uint8List(list.length);
+    int length = list.length;
+    for (int i = 0; i < length; ++i) {
+      u8[i] = (list[i] >> 24) + 128;
+    }
+    return u8;
+  }
+
+  static Uint8List _float32ListToUint8(Float32List list) {
+    var u8 = Uint8List(list.length);
+    int length = list.length;
+    for (int i = 0; i < length; ++i) {
+      u8[i] = (list[i] * 128 + 128).floor().clamp(0, 255);
+    }
+    return u8;
+  }
+
+  static Uint8List _float64ListToUint8(Float64List list) {
+    var u8 = Uint8List(list.length);
+    int length = list.length;
+    for (int i = 0; i < length; ++i) {
+      u8[i] = (list[i] * 128 + 128).floor().clamp(0, 255);
+    }
+    return u8;
+  }
+}
+
+class Uint8Storage extends IWavSamplesStorage {
+  final List<Uint8List> samplesData;
+
+  Uint8Storage(this.samplesData, super.samplesPerChannel) {
+    if (!samplesData.every((element) => element.length == samplesPerChannel)) {
+      throw ArgumentError('not all channels are with the same length');
+    }
+  }
+  factory Uint8Storage.fromBytes(
+      int channels, ByteData data, Endian numEndianess) {
+    int samplesPerChannel = data.lengthInBytes ~/ channels;
+    List<Uint8List> samplesData =
+        List.generate(channels, (index) => Uint8List(samplesPerChannel));
+    int currentDataOffset = 0;
+    for (int s = 0; s < samplesPerChannel; ++s) {
+      for (int ch = 0; ch < channels; ++ch) {
+        samplesData[ch][s] = data.getUint8(currentDataOffset);
+        currentDataOffset += 1;
+      }
+    }
+    return Uint8Storage(samplesData, samplesPerChannel);
+  }
+
+  @override
+  void writeStorage(ByteData data, Endian numEndianess, int bytesPerSample) {
+    if (bytesPerSample != 1) throw ArgumentError("Unexpected bytesPerSample");
+    int currentDataOffset = 0;
+    for (int s = 0; s < samplesPerChannel; ++s) {
+      for (int ch = 0; ch < channels; ++ch) {
+        data.setUint8(currentDataOffset, samplesData[ch][s]);
+        currentDataOffset += 1;
+      }
+    }
+  }
+
+  @override
+  int get channels => samplesData.length;
+
+  @override
+  IWavSamplesStorage mixTogether(
+      int totalLength, int numChannels, List<MixingInfo> mixInfo) {
+    var samplesData = List.generate(numChannels, (index) {
+      var list = Uint8List(totalLength);
+      for (int i = 0; i < totalLength; i++) {
+        list[i] = 128;
+      }
+      return list;
+    });
+    for (var m in mixInfo) {
+      if (m.input is! Uint8Storage) {
+        continue;
+      }
+      for (var chm in m.channelMappings) {
+        int actualLength = min(chm.length, totalLength - chm.offsetOutput);
+        actualLength = min(actualLength, m.input.length - chm.offsetSource);
+        int inChannelIndex = chm.fromChannel;
+        if (inChannelIndex < 0) {
+          continue;
+        }
+        var inputChannel =
+            (m.input as Uint8Storage).samplesData[inChannelIndex];
+        var outputChannel = samplesData[chm.toChannel];
+        double scale = chm.scale;
+        if (scale.abs() > 16383 || scale.abs() < 0.000061035) {
+          continue;
+        }
+        if (scale == 0) {
+          continue;
+        }
+        if (scale == 1) {
+          for (int s = 0; s < actualLength; ++s) {
+            outputChannel[chm.offsetOutput + s] =
+                (inputChannel[chm.offsetSource + s] - 128 +
+                        outputChannel[chm.offsetOutput + s] - 128 + 128)
+                    .clamp(0, 255);
+          }
+        } else {
+          int intScale = (scale * (1 << 16)).toInt();
+          for (int s = 0; s < actualLength; ++s) {
+            outputChannel[chm.offsetOutput + s] =
+                (((inputChannel[chm.offsetSource + s] - 128) * intScale >> 16) +
+                        outputChannel[chm.offsetOutput + s] - 128 + 128)
+                    .clamp(0, 255);
+          }
+        }
+      }
+    }
+    return Uint8Storage(samplesData, totalLength);
+  }
+
+  @override
+  Float32Storage convertToFloat32() {
+    return Float32Storage(
+        List<Float32List>.generate(
+            samplesData.length,
+            (index) =>
+                IWavSamplesStorage._uint8ListToFloat32(samplesData[index])),
+        samplesPerChannel);
+  }
+
+  @override
+  Int16Storage convertToInt16() {
+    return Int16Storage(
+        List<Int16List>.generate(
+            samplesData.length,
+            (index) =>
+                IWavSamplesStorage._uint8ListToInt16(samplesData[index])),
+        samplesPerChannel);
+  }
+
+  @override
+  Int32Storage convertToInt32() {
+    return Int32Storage(
+        List<Int32List>.generate(
+            samplesData.length,
+            (index) =>
+                IWavSamplesStorage._uint8ListToInt32(samplesData[index])),
+        samplesPerChannel);
+  }
+
+  @override
+  Float64Storage convertToFloat64() {
+    return Float64Storage(
+        List<Float64List>.generate(
+            samplesData.length,
+            (index) =>
+                IWavSamplesStorage._uint8ListToFloat64(samplesData[index])),
+        samplesPerChannel);
+  }
+
+  @override
+  Uint8Storage convertToUint8() {
+    return Uint8Storage(
+        List<Uint8List>.generate(samplesData.length,
+            (index) => Uint8List.fromList(samplesData[index])),
+        samplesPerChannel);
   }
 }
 
@@ -273,6 +487,16 @@ class Int16Storage extends IWavSamplesStorage {
             samplesData.length,
             (index) =>
                 IWavSamplesStorage._int16ListToFloat64(samplesData[index])),
+        samplesPerChannel);
+  }
+
+  @override
+  Uint8Storage convertToUint8() {
+    return Uint8Storage(
+        List<Uint8List>.generate(
+            samplesData.length,
+            (index) =>
+                IWavSamplesStorage._int16ListToUint8(samplesData[index])),
         samplesPerChannel);
   }
 }
@@ -425,6 +649,16 @@ class Int32Storage extends IWavSamplesStorage {
                 IWavSamplesStorage._int32ListToFloat64(samplesData[index])),
         samplesPerChannel);
   }
+
+  @override
+  Uint8Storage convertToUint8() {
+    return Uint8Storage(
+        List<Uint8List>.generate(
+            samplesData.length,
+            (index) =>
+                IWavSamplesStorage._int32ListToUint8(samplesData[index])),
+        samplesPerChannel);
+  }
 }
 
 class Float64Storage extends IWavSamplesStorage {
@@ -541,6 +775,16 @@ class Float64Storage extends IWavSamplesStorage {
                 IWavSamplesStorage._float64ListToInt32(samplesData[index])),
         samplesPerChannel);
   }
+
+  @override
+  Uint8Storage convertToUint8() {
+    return Uint8Storage(
+        List<Uint8List>.generate(
+            samplesData.length,
+            (index) =>
+                IWavSamplesStorage._float64ListToUint8(samplesData[index])),
+        samplesPerChannel);
+  }
 }
 
 class Float32Storage extends IWavSamplesStorage {
@@ -655,6 +899,16 @@ class Float32Storage extends IWavSamplesStorage {
             samplesData.length,
             (index) =>
                 IWavSamplesStorage._float32ListToInt32(samplesData[index])),
+        samplesPerChannel);
+  }
+
+  @override
+  Uint8Storage convertToUint8() {
+    return Uint8Storage(
+        List<Uint8List>.generate(
+            samplesData.length,
+            (index) =>
+                IWavSamplesStorage._float32ListToUint8(samplesData[index])),
         samplesPerChannel);
   }
 }

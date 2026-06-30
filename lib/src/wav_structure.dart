@@ -356,6 +356,16 @@ abstract class IWavContent {
         data, numEndianess, format.containerBitsPerSample ~/ 8);
   }
 
+  WavContent<Uint8Storage> toPcm8() {
+    return WavContent<Uint8Storage>(
+        WavFormat(format.numChannels, format.sampleRate, 1 * format.numChannels,
+            8, 8, FormatType.pcm8,
+            channelMask: format.channelMask),
+        StorageType.uint8,
+        _samplesStorage.convertToUint8(),
+        info: info);
+  }
+
   WavContent<Int16Storage> toPcm16() {
     return WavContent<Int16Storage>(
         WavFormat(format.numChannels, format.sampleRate, 2 * format.numChannels,
@@ -408,6 +418,8 @@ abstract class IWavContent {
 
   IWavContent to(String format) {
     switch (format) {
+      case 'u8':
+        return toPcm8();
       case 'i16':
         return toPcm16();
       case 'i24':
@@ -420,11 +432,13 @@ abstract class IWavContent {
         return toFloat64();
     }
     throw ArgumentError(
-        "unrecognized format string. should be one of i16|i24|i32|f32|f64");
+        "unrecognized format string. should be one of u8|i16|i24|i32|f32|f64");
   }
 
   IWavContent toFormat(FormatType formatType) {
     switch (formatType) {
+      case FormatType.pcm8:
+        return toPcm8();
       case FormatType.pcm16:
         return toPcm16();
       case FormatType.pcm24:
@@ -443,6 +457,7 @@ class WavContent<T extends IWavSamplesStorage> extends IWavContent {
   /// The lists of samples per each audio channel
   T get samplesStorage => _samplesStorage as T;
   static const _storageTypeCheck = <StorageType, Type>{
+    StorageType.uint8: Uint8Storage,
     StorageType.int16: Int16Storage,
     StorageType.int32: Int32Storage,
     StorageType.float32: Float32Storage,

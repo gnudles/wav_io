@@ -259,13 +259,18 @@ Result<IWavContent, WavParsingError> loadWav(ByteData data) {
   }
   IWavContent? output;
   const formatToStorageConversion = [
+    StorageType.uint8,
     StorageType.int16,
     StorageType.int32,
     StorageType.int32,
     StorageType.float32,
     StorageType.float64
   ];
-  if (samplesStorage is Int16Storage) {
+  if (samplesStorage is Uint8Storage) {
+    output = WavContent<Uint8Storage>(wavFormat,
+        formatToStorageConversion[wavFormat.formatType.index], samplesStorage,
+        info: listInfo);
+  } else if (samplesStorage is Int16Storage) {
     output = WavContent<Int16Storage>(wavFormat,
         formatToStorageConversion[wavFormat.formatType.index], samplesStorage,
         info: listInfo);
@@ -290,7 +295,9 @@ Result<IWavContent, WavParsingError> loadWav(ByteData data) {
 
 FormatType recommandedFormatType(int wFormatTag, int bitsPerSample) {
   if (wFormatTag == WAVE_FORMAT_PCM) {
-    if (bitsPerSample == 24) {
+    if (bitsPerSample == 8) {
+      return FormatType.pcm8;
+    } else if (bitsPerSample == 24) {
       return FormatType.pcm24;
     } else if (bitsPerSample == 32) {
       return FormatType.pcm32;
@@ -353,7 +360,7 @@ Result<WavFormat, WavParsingError> parseFmt(
   {
     return Result.error(WavParsingError.invalidBitsPerSample);
   }
-  if (bitsPerSample <= 8)
+  if (bitsPerSample < 8)
   {
     return Result.error(WavParsingError.unsupportedBitsPerSample);
   }
@@ -412,7 +419,11 @@ Result<IWavSamplesStorage, WavParsingError> parseDataChunk(
   if (data.lengthInBytes == 0 || data.lengthInBytes % wavFormat.blockAlign != 0) {
     return Result.error(WavParsingError.invalidDataChunkSize);
   }
-  if (wavFormat.formatType == FormatType.pcm16 &&
+  if (wavFormat.formatType == FormatType.pcm8 &&
+      wavFormat.containerBitsPerSample == 8) {
+    return Result.ok(
+        Uint8Storage.fromBytes(wavFormat.numChannels, data, numEndianess));
+  } else if (wavFormat.formatType == FormatType.pcm16 &&
       wavFormat.containerBitsPerSample == 16) {
     return Result.ok(
         Int16Storage.fromBytes(wavFormat.numChannels, data, numEndianess));
