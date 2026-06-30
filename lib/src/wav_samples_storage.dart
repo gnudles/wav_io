@@ -955,7 +955,7 @@ void _mixInt32Simd(Int32List inputChannel, Int32List outputChannel, int offsetSo
 
 void _mixFloat32Simd(Float32List inputChannel, Float32List outputChannel, int offsetSource, int offsetOutput, int actualLength, double scale) {
   int s = 0;
-  if (offsetSource % 4 == offsetOutput % 4) {
+  if (actualLength >= 32 && offsetSource % 4 == offsetOutput % 4) {
     int alignOffset = (4 - (offsetSource % 4)) % 4;
     int preLoop = min(alignOffset, actualLength);
     for (; s < preLoop; ++s) {
@@ -995,7 +995,7 @@ void _mixFloat32Simd(Float32List inputChannel, Float32List outputChannel, int of
 
 void _mixFloat64Simd(Float64List inputChannel, Float64List outputChannel, int offsetSource, int offsetOutput, int actualLength, double scale) {
   int s = 0;
-  if (offsetSource % 2 == offsetOutput % 2) {
+  if (actualLength >= 32 && offsetSource % 2 == offsetOutput % 2) {
     int alignOffset = (2 - (offsetSource % 2)) % 2;
     int preLoop = min(alignOffset, actualLength);
     for (; s < preLoop; ++s) {
