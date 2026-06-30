@@ -122,7 +122,10 @@ enum WavParsingError {
   invalidFmtSizeForFloat,
   invalidFmtSizeForExtensible,
   unsupportedFormat,
+  invalidNumChannels,
   invalidSampleRate,
+  invalidByteRate,
+  invalidBlockAlign,
   invalidBitsPerSample,
   unsupportedBitsPerSample,
   invalidExtensionSize,
@@ -321,6 +324,9 @@ Result<WavFormat, WavParsingError> parseFmt(
   }
 
   int numChannels = data.getUint16(2, numEndianess);
+  if (numChannels == 0 || numChannels > 1024) {
+    return Result.error(WavParsingError.invalidNumChannels);
+  }
   int channelMask = 0;
   if (wFormatTag == WAVE_FORMAT_PCM || wFormatTag == WAVE_FORMAT_IEEE_FLOAT) {
     if (numChannels == 1) {
@@ -337,10 +343,13 @@ Result<WavFormat, WavParsingError> parseFmt(
   int byteRate = data.getUint32(8, numEndianess); // bytes per second
   int blockAlign = data.getUint16(
       12, numEndianess); //total bytes in all channels for a single sample.
+  if (blockAlign == 0) {
+    return Result.error(WavParsingError.invalidBlockAlign);
+  }
 
   int bitsPerSample = data.getUint16(14, numEndianess);
   int validBitsPerSample = bitsPerSample;
-  if (bitsPerSample == 0)
+  if (bitsPerSample == 0 || bitsPerSample > 64)
   {
     return Result.error(WavParsingError.invalidBitsPerSample);
   }
@@ -351,13 +360,13 @@ Result<WavFormat, WavParsingError> parseFmt(
   int bytesPerSample = blockAlign ~/ numChannels;
   int bytesPerSampleUp = (bitsPerSample + 7) ~/ 8;
   if (blockAlign % numChannels != 0) {
-    throw ArgumentError("bad block alignment. got $blockAlign");
+    return Result.error(WavParsingError.invalidBlockAlign);
   }
   if (bytesPerSample != bytesPerSampleUp) {
-    throw ArgumentError("bad block alignment. got $blockAlign");
+    return Result.error(WavParsingError.invalidBlockAlign);
   }
   if (byteRate != blockAlign * sampleRate) {
-    throw ArgumentError("bad bytes per second. got $byteRate");
+    return Result.error(WavParsingError.invalidByteRate);
   }
 
   if (data.lengthInBytes >= 18) {
@@ -367,6 +376,9 @@ Result<WavFormat, WavParsingError> parseFmt(
     }
     if (wFormatTag == WAVE_FORMAT_EXTENSIBLE) {
       validBitsPerSample = data.getUint16(18, numEndianess);
+      if (validBitsPerSample > bitsPerSample) {
+        return Result.error(WavParsingError.invalidBitsPerSample);
+      }
       channelMask = data.getUint32(20, numEndianess);
       var subFormatGUID = data.buffer.asUint8List(data.offsetInBytes + 24, 16);
       if (GUID.equal(subFormatGUID, KSDATAFORMAT_SUBTYPE_PCM)) {
@@ -397,7 +409,7 @@ Result<WavFormat, WavParsingError> parseFmt(
 
 Result<IWavSamplesStorage, WavParsingError> parseDataChunk(
     ByteData data, Endian numEndianess, WavFormat wavFormat) {
-  if (data.lengthInBytes % wavFormat.blockAlign != 0) {
+  if (data.lengthInBytes == 0 || wavFormat.blockAlign > data.lengthInBytes || data.lengthInBytes % wavFormat.blockAlign != 0) {
     return Result.error(WavParsingError.invalidDataChunkSize);
   }
   if (wavFormat.formatType == FormatType.pcm16 &&
