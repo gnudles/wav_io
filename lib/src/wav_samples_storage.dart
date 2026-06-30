@@ -361,12 +361,24 @@ class Uint8Storage extends IWavSamplesStorage {
 
   @override
   Int32Storage convertToInt32() {
-    return Int32Storage(
-        List<Int32List>.generate(
-            samplesData.length,
-            (index) =>
-                IWavSamplesStorage._uint8ListToInt32(samplesData[index])),
-        samplesPerChannel);
+    var converted = List.generate(samplesData.length, (index) {
+      var simd = Int32x4List((samplesPerChannel + 3) ~/ 4);
+      var i32 = Int32List.view(simd.buffer, simd.offsetInBytes, samplesPerChannel);
+      var src = samplesData[index];
+      for(int i=0; i<samplesPerChannel; i++) i32[i] = (src[i] - 128) << 24;
+      return i32;
+    });
+    var maxAbsValues = List.generate(samplesData.length, (index) {
+      int max = 0;
+      var c = converted[index];
+      for(int i=0; i<samplesPerChannel; i++) {
+        int a = c[i].abs();
+        if(a > max) max = a;
+      }
+      return max;
+    });
+    var simdData = converted.map((c) => Int32x4List.view(c.buffer, c.offsetInBytes, (c.buffer.lengthInBytes - c.offsetInBytes) ~/ 16)).toList();
+    return Int32Storage(converted, samplesPerChannel, maxAbsValues, simdData);
   }
 
   @override
@@ -497,12 +509,24 @@ class Int16Storage extends IWavSamplesStorage {
 
   @override
   Int32Storage convertToInt32() {
-    return Int32Storage(
-        List<Int32List>.generate(
-            samplesData.length,
-            (index) =>
-                IWavSamplesStorage._int16ListToInt32(samplesData[index])),
-        samplesPerChannel);
+    var converted = List.generate(samplesData.length, (index) {
+      var simd = Int32x4List((samplesPerChannel + 3) ~/ 4);
+      var i32 = Int32List.view(simd.buffer, simd.offsetInBytes, samplesPerChannel);
+      var src = samplesData[index];
+      for(int i=0; i<samplesPerChannel; i++) i32[i] = src[i] << 16;
+      return i32;
+    });
+    var maxAbsValues = List.generate(samplesData.length, (index) {
+      int max = 0;
+      var c = converted[index];
+      for(int i=0; i<samplesPerChannel; i++) {
+        int a = c[i].abs();
+        if(a > max) max = a;
+      }
+      return max;
+    });
+    var simdData = converted.map((c) => Int32x4List.view(c.buffer, c.offsetInBytes, (c.buffer.lengthInBytes - c.offsetInBytes) ~/ 16)).toList();
+    return Int32Storage(converted, samplesPerChannel, maxAbsValues, simdData);
   }
 
   @override
@@ -529,8 +553,9 @@ class Int16Storage extends IWavSamplesStorage {
 class Int32Storage extends IWavSamplesStorage {
   final List<Int32List> samplesData;
   final List<Int32x4List>? simdData;
+  final List<int> maxAbsValues;
 
-  Int32Storage(this.samplesData, super.samplesPerChannel, [this.simdData]) {
+  Int32Storage(this.samplesData, super.samplesPerChannel, this.maxAbsValues, [this.simdData]) {
     if (!samplesData.every((element) => element.length == samplesPerChannel)) {
       throw ArgumentError('not all channels are with the same length');
     }
@@ -543,13 +568,17 @@ class Int32Storage extends IWavSamplesStorage {
     List<Int32List> samplesData = List.generate(channels,
         (index) => Int32List.view(simdData[index].buffer, simdData[index].offsetInBytes, samplesPerChannel));
     int currentDataOffset = 0;
+    List<int> maxAbsValues = List.filled(channels, 0);
     for (int s = 0; s < samplesPerChannel; ++s) {
       for (int ch = 0; ch < channels; ++ch) {
-        samplesData[ch][s] = data.getInt32(currentDataOffset, numEndianess);
+        int val = data.getInt32(currentDataOffset, numEndianess);
+        samplesData[ch][s] = val;
+        int absVal = val.abs();
+        if (absVal > maxAbsValues[ch]) maxAbsValues[ch] = absVal;
         currentDataOffset += 4;
       }
     }
-    return Int32Storage(samplesData, samplesPerChannel, simdData);
+    return Int32Storage(samplesData, samplesPerChannel, maxAbsValues, simdData);
   }
 
   factory Int32Storage.fromBytes24(
@@ -560,14 +589,17 @@ class Int32Storage extends IWavSamplesStorage {
     List<Int32List> samplesData = List.generate(channels,
         (index) => Int32List.view(simdData[index].buffer, simdData[index].offsetInBytes, samplesPerChannel));
     int currentDataOffset = 0;
+    List<int> maxAbsValues = List.filled(channels, 0);
     for (int s = 0; s < samplesPerChannel; ++s) {
       for (int ch = 0; ch < channels; ++ch) {
-        samplesData[ch][s] =
-            data.getInt24(currentDataOffset, numEndianess) << 8;
+        int val = data.getInt24(currentDataOffset, numEndianess) << 8;
+        samplesData[ch][s] = val;
+        int absVal = val.abs();
+        if (absVal > maxAbsValues[ch]) maxAbsValues[ch] = absVal;
         currentDataOffset += 3;
       }
     }
-    return Int32Storage(samplesData, samplesPerChannel, simdData);
+    return Int32Storage(samplesData, samplesPerChannel, maxAbsValues, simdData);
   }
   @override
   void writeStorage(ByteData data, Endian numEndianess, int bytesPerSample) {
@@ -600,35 +632,62 @@ class Int32Storage extends IWavSamplesStorage {
       int totalLength, int numChannels, List<MixingInfo> mixInfo) {
     var simdData = List.generate(numChannels, (index) => Int32x4List((totalLength + 3) ~/ 4));
     var samplesData = List.generate(numChannels, (index) => Int32List.view(simdData[index].buffer, simdData[index].offsetInBytes, totalLength));
+    List<int> outMaxAbsValues = List.filled(numChannels, 0);
+
+    var channelOps = List.generate(numChannels, (index) => <_Int32MixOp>[]);
+
     for (var m in mixInfo) {
-      if (m.input is! Int32Storage) {
-        continue;
-      }
+      if (m.input is! Int32Storage) continue;
+      var int32Input = m.input as Int32Storage;
       for (var chm in m.channelMappings) {
         int actualLength = min(chm.length, totalLength - chm.offsetOutput);
         actualLength = min(actualLength, m.input.length - chm.offsetSource);
         int inChannelIndex = chm.fromChannel;
-        if (inChannelIndex < 0 || inChannelIndex >= m.input.channels) {
-          continue;
-        }
+        if (inChannelIndex < 0 || inChannelIndex >= m.input.channels) continue;
         int outChannelIndex = chm.toChannel;
-        if (outChannelIndex < 0 || outChannelIndex >= numChannels) {
-          continue;
-        }
-        var inputChannel =
-            (m.input as Int32Storage).samplesData[inChannelIndex];
-        var outputChannel = samplesData[outChannelIndex];
+        if (outChannelIndex < 0 || outChannelIndex >= numChannels) continue;
+
         double scale = chm.scale;
-        if (scale.abs() > pow(2, 31) || scale.abs() < pow(2, -31)) {
-          continue;
-        }
-        if (scale == 0) {
-          continue;
-        }
-        _mixInt32Simd(inputChannel, outputChannel, chm.offsetSource, chm.offsetOutput, actualLength, scale);
+        if (scale.abs() > pow(2, 31) || scale.abs() < pow(2, -31)) continue;
+        if (scale == 0) continue;
+
+        double theoreticalPeak = scale.abs() * int32Input.maxAbsValues[inChannelIndex];
+        channelOps[outChannelIndex].add(_Int32MixOp(
+          inputChannel: int32Input.samplesData[inChannelIndex],
+          offsetSource: chm.offsetSource,
+          offsetOutput: chm.offsetOutput,
+          actualLength: actualLength,
+          scale: scale,
+          theoreticalPeak: theoreticalPeak
+        ));
       }
     }
-    return Int32Storage(samplesData, totalLength, simdData);
+
+    for (int outCh = 0; outCh < numChannels; ++outCh) {
+      var ops = channelOps[outCh];
+      ops.sort((a, b) => a.theoreticalPeak.compareTo(b.theoreticalPeak));
+
+      double cumulativePeak = 0;
+      var outputChannel = samplesData[outCh];
+
+      for (var op in ops) {
+        cumulativePeak += op.theoreticalPeak;
+        if (cumulativePeak <= 2147483647 && op.scale == 1.0) {
+          _mixInt32SimdFast(op.inputChannel, outputChannel, op.offsetSource, op.offsetOutput, op.actualLength);
+        } else {
+          _mixInt32ScalarClamp(op.inputChannel, outputChannel, op.offsetSource, op.offsetOutput, op.actualLength, op.scale);
+        }
+      }
+
+      int maxAbs = 0;
+      for (int i = 0; i < totalLength; ++i) {
+         int absVal = outputChannel[i].abs();
+         if (absVal > maxAbs) maxAbs = absVal;
+      }
+      outMaxAbsValues[outCh] = maxAbs;
+    }
+
+    return Int32Storage(samplesData, totalLength, outMaxAbsValues, simdData);
   }
 
   @override
@@ -657,7 +716,7 @@ class Int32Storage extends IWavSamplesStorage {
       return i32;
     });
     var simdData = converted.map((c) => Int32x4List.view(c.buffer, c.offsetInBytes, (c.buffer.lengthInBytes - c.offsetInBytes) ~/ 16)).toList();
-    return Int32Storage(converted, samplesPerChannel, simdData);
+    return Int32Storage(converted, samplesPerChannel, List.from(maxAbsValues), simdData);
   }
 
   @override
@@ -788,15 +847,24 @@ class Float64Storage extends IWavSamplesStorage {
 
   @override
   Int32Storage convertToInt32() {
-    var converted = List.generate(samplesData.length, (index) => IWavSamplesStorage._float64ListToInt32(samplesData[index]));
-
-
-
-    var simdData = List.generate(samplesData.length, (index) {
-        var c = converted[index];
-        return Int32x4List.view(c.buffer, c.offsetInBytes, (c.buffer.lengthInBytes - c.offsetInBytes) ~/ 16);
+    var converted = List.generate(samplesData.length, (index) {
+      var simd = Int32x4List((samplesPerChannel + 3) ~/ 4);
+      var i32 = Int32List.view(simd.buffer, simd.offsetInBytes, samplesPerChannel);
+      var src = samplesData[index];
+      for(int i=0; i<samplesPerChannel; i++) i32[i] = (src[i] * 2147483647).toInt();
+      return i32;
     });
-    return Int32Storage(converted, samplesPerChannel, simdData);
+    var maxAbsValues = List.generate(samplesData.length, (index) {
+      int max = 0;
+      var c = converted[index];
+      for(int i=0; i<samplesPerChannel; i++) {
+        int a = c[i].abs();
+        if(a > max) max = a;
+      }
+      return max;
+    });
+    var simdData = converted.map((c) => Int32x4List.view(c.buffer, c.offsetInBytes, (c.buffer.lengthInBytes - c.offsetInBytes) ~/ 16)).toList();
+    return Int32Storage(converted, samplesPerChannel, maxAbsValues, simdData);
   }
 
   @override
@@ -920,9 +988,24 @@ class Float32Storage extends IWavSamplesStorage {
 
   @override
   Int32Storage convertToInt32() {
-    var converted = List.generate(samplesData.length, (index) => IWavSamplesStorage._float32ListToInt32(samplesData[index]));
+    var converted = List.generate(samplesData.length, (index) {
+      var simd = Int32x4List((samplesPerChannel + 3) ~/ 4);
+      var i32 = Int32List.view(simd.buffer, simd.offsetInBytes, samplesPerChannel);
+      var src = samplesData[index];
+      for(int i=0; i<samplesPerChannel; i++) i32[i] = (src[i] * 2147483647).toInt();
+      return i32;
+    });
+    var maxAbsValues = List.generate(samplesData.length, (index) {
+      int max = 0;
+      var c = converted[index];
+      for(int i=0; i<samplesPerChannel; i++) {
+        int a = c[i].abs();
+        if(a > max) max = a;
+      }
+      return max;
+    });
     var simdData = converted.map((c) => Int32x4List.view(c.buffer, c.offsetInBytes, (c.buffer.lengthInBytes - c.offsetInBytes) ~/ 16)).toList();
-    return Int32Storage(converted, samplesPerChannel, simdData);
+    return Int32Storage(converted, samplesPerChannel, maxAbsValues, simdData);
   }
 
   @override
@@ -936,9 +1019,50 @@ class Float32Storage extends IWavSamplesStorage {
   }
 }
 
-void _mixInt32Simd(Int32List inputChannel, Int32List outputChannel, int offsetSource, int offsetOutput, int actualLength, double scale) {
-  // SIMD Int32x4 does not support clamping natively without severe performance hits (creating new objects),
-  // so we revert to scalar processing for the mix loop, but the buffers remain SIMD aligned.
+class _Int32MixOp {
+  final Int32List inputChannel;
+  final int offsetSource;
+  final int offsetOutput;
+  final int actualLength;
+  final double scale;
+  final double theoreticalPeak;
+
+  _Int32MixOp({
+    required this.inputChannel,
+    required this.offsetSource,
+    required this.offsetOutput,
+    required this.actualLength,
+    required this.scale,
+    required this.theoreticalPeak,
+  });
+}
+
+void _mixInt32SimdFast(Int32List inputChannel, Int32List outputChannel, int offsetSource, int offsetOutput, int actualLength) {
+  int s = 0;
+  if (actualLength >= 32 && offsetSource % 4 == offsetOutput % 4) {
+    int alignOffset = (4 - (offsetSource % 4)) % 4;
+    int preLoop = min(alignOffset, actualLength);
+    for (; s < preLoop; ++s) {
+      outputChannel[offsetOutput + s] = inputChannel[offsetSource + s] + outputChannel[offsetOutput + s];
+    }
+
+    int simdLength = (actualLength - s) ~/ 4;
+    if (simdLength > 0) {
+      var inSimd = Int32x4List.view(inputChannel.buffer, inputChannel.offsetInBytes + (offsetSource + s) * 4, simdLength);
+      var outSimd = Int32x4List.view(outputChannel.buffer, outputChannel.offsetInBytes + (offsetOutput + s) * 4, simdLength);
+      for (int i = 0; i < simdLength; ++i) {
+         outSimd[i] = inSimd[i] + outSimd[i];
+      }
+      s += simdLength * 4;
+    }
+  }
+
+  for (; s < actualLength; ++s) {
+    outputChannel[offsetOutput + s] = inputChannel[offsetSource + s] + outputChannel[offsetOutput + s];
+  }
+}
+
+void _mixInt32ScalarClamp(Int32List inputChannel, Int32List outputChannel, int offsetSource, int offsetOutput, int actualLength, double scale) {
   if (scale == 1.0) {
     for (int s = 0; s < actualLength; ++s) {
       outputChannel[offsetOutput + s] = (inputChannel[offsetSource + s] + outputChannel[offsetOutput + s]).clamp(-2147483648, 2147483647);
