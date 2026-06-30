@@ -409,7 +409,7 @@ Result<WavFormat, WavParsingError> parseFmt(
 
 Result<IWavSamplesStorage, WavParsingError> parseDataChunk(
     ByteData data, Endian numEndianess, WavFormat wavFormat) {
-  if (data.lengthInBytes == 0 || wavFormat.blockAlign > data.lengthInBytes || data.lengthInBytes % wavFormat.blockAlign != 0) {
+  if (data.lengthInBytes == 0 || data.lengthInBytes % wavFormat.blockAlign != 0) {
     return Result.error(WavParsingError.invalidDataChunkSize);
   }
   if (wavFormat.formatType == FormatType.pcm16 &&
