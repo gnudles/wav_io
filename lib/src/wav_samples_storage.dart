@@ -68,7 +68,8 @@ abstract class IWavSamplesStorage {
   }*/
 
   static Float32List _int16ListToFloat32(Int16List list) {
-    var fl = Float32List(list.length);
+    var simd = Float32x4List((list.length + 3) ~/ 4);
+    var fl = Float32List.view(simd.buffer, simd.offsetInBytes, list.length);
     int length = list.length;
     final double multiplier = 1 / (1 << 15);
     for (int i = 0; i < length; ++i) {
@@ -78,7 +79,8 @@ abstract class IWavSamplesStorage {
   }
 
   static Float64List _int16ListToFloat64(Int16List list) {
-    var fl = Float64List(list.length);
+    var simd = Float64x2List((list.length + 1) ~/ 2);
+    var fl = Float64List.view(simd.buffer, simd.offsetInBytes, list.length);
     int length = list.length;
     final double multiplier = 1 / (1 << 15);
     for (int i = 0; i < length; ++i) {
@@ -88,7 +90,8 @@ abstract class IWavSamplesStorage {
   }
 
   static Float32List _int32ListToFloat32(Int32List list) {
-    var fl = Float32List(list.length);
+    var simd = Float32x4List((list.length + 3) ~/ 4);
+    var fl = Float32List.view(simd.buffer, simd.offsetInBytes, list.length);
     int length = list.length;
     final double multiplier = 1 / (1 << 31);
     for (int i = 0; i < length; ++i) {
@@ -98,7 +101,8 @@ abstract class IWavSamplesStorage {
   }
 
   static Float64List _int32ListToFloat64(Int32List list) {
-    var fl = Float64List(list.length);
+    var simd = Float64x2List((list.length + 1) ~/ 2);
+    var fl = Float64List.view(simd.buffer, simd.offsetInBytes, list.length);
     int length = list.length;
     final double multiplier = 1 / (1 << 31);
     for (int i = 0; i < length; ++i) {
@@ -117,7 +121,8 @@ abstract class IWavSamplesStorage {
   }
 
   static Int32List _int16ListToInt32(Int16List list) {
-    var i32 = Int32List(list.length);
+    var simd = Int32x4List((list.length + 3) ~/ 4);
+    var i32 = Int32List.view(simd.buffer, simd.offsetInBytes, list.length);
     int length = list.length;
     for (int i = 0; i < length; ++i) {
       i32[i] = list[i] << 16;
@@ -135,7 +140,8 @@ abstract class IWavSamplesStorage {
   }
 
   static Int32List _float32ListToInt32(Float32List list) {
-    var i32 = Int32List(list.length);
+    var simd = Int32x4List((list.length + 3) ~/ 4);
+    var i32 = Int32List.view(simd.buffer, simd.offsetInBytes, list.length);
     int length = list.length;
     for (int i = 0; i < length; ++i) {
       i32[i] = (list[i] * 2147483648).floor().clamp(-2147483648, 2147483647);
@@ -153,7 +159,8 @@ abstract class IWavSamplesStorage {
   }
 
   static Int32List _float64ListToInt32(Float64List list) {
-    var i32 = Int32List(list.length);
+    var simd = Int32x4List((list.length + 3) ~/ 4);
+    var i32 = Int32List.view(simd.buffer, simd.offsetInBytes, list.length);
     int length = list.length;
     for (int i = 0; i < length; ++i) {
       i32[i] = (list[i] * 2147483648).floor().clamp(-2147483648, 2147483647);
@@ -172,7 +179,8 @@ abstract class IWavSamplesStorage {
   }
 
   static Float64List _uint8ListToFloat64(Uint8List list) {
-    var fl = Float64List(list.length);
+    var simd = Float64x2List((list.length + 1) ~/ 2);
+    var fl = Float64List.view(simd.buffer, simd.offsetInBytes, list.length);
     int length = list.length;
     final double multiplier = 1 / 128.0;
     for (int i = 0; i < length; ++i) {
@@ -191,7 +199,8 @@ abstract class IWavSamplesStorage {
   }
 
   static Int32List _uint8ListToInt32(Uint8List list) {
-    var i32 = Int32List(list.length);
+    var simd = Int32x4List((list.length + 3) ~/ 4);
+    var i32 = Int32List.view(simd.buffer, simd.offsetInBytes, list.length);
     int length = list.length;
     for (int i = 0; i < length; ++i) {
       i32[i] = (list[i] - 128) << 24;
@@ -519,8 +528,9 @@ class Int16Storage extends IWavSamplesStorage {
 
 class Int32Storage extends IWavSamplesStorage {
   final List<Int32List> samplesData;
+  final List<Int32x4List>? simdData;
 
-  Int32Storage(this.samplesData, super.samplesPerChannel) {
+  Int32Storage(this.samplesData, super.samplesPerChannel, [this.simdData]) {
     if (!samplesData.every((element) => element.length == samplesPerChannel)) {
       throw ArgumentError('not all channels are with the same length');
     }
@@ -528,8 +538,10 @@ class Int32Storage extends IWavSamplesStorage {
   factory Int32Storage.fromBytes32(
       int channels, ByteData data, Endian numEndianess) {
     int samplesPerChannel = data.lengthInBytes ~/ (channels * 4);
-    List<Int32List> samplesData =
-        List.generate(channels, (index) => Int32List(samplesPerChannel));
+    List<Int32x4List> simdData = List.generate(
+        channels, (index) => Int32x4List((samplesPerChannel + 3) ~/ 4));
+    List<Int32List> samplesData = List.generate(channels,
+        (index) => Int32List.view(simdData[index].buffer, simdData[index].offsetInBytes, samplesPerChannel));
     int currentDataOffset = 0;
     for (int s = 0; s < samplesPerChannel; ++s) {
       for (int ch = 0; ch < channels; ++ch) {
@@ -537,14 +549,16 @@ class Int32Storage extends IWavSamplesStorage {
         currentDataOffset += 4;
       }
     }
-    return Int32Storage(samplesData, samplesPerChannel);
+    return Int32Storage(samplesData, samplesPerChannel, simdData);
   }
 
   factory Int32Storage.fromBytes24(
       int channels, ByteData data, Endian numEndianess) {
     int samplesPerChannel = data.lengthInBytes ~/ (channels * 3);
-    List<Int32List> samplesData =
-        List.generate(channels, (index) => Int32List(samplesPerChannel));
+    List<Int32x4List> simdData = List.generate(
+        channels, (index) => Int32x4List((samplesPerChannel + 3) ~/ 4));
+    List<Int32List> samplesData = List.generate(channels,
+        (index) => Int32List.view(simdData[index].buffer, simdData[index].offsetInBytes, samplesPerChannel));
     int currentDataOffset = 0;
     for (int s = 0; s < samplesPerChannel; ++s) {
       for (int ch = 0; ch < channels; ++ch) {
@@ -553,7 +567,7 @@ class Int32Storage extends IWavSamplesStorage {
         currentDataOffset += 3;
       }
     }
-    return Int32Storage(samplesData, samplesPerChannel);
+    return Int32Storage(samplesData, samplesPerChannel, simdData);
   }
   @override
   void writeStorage(ByteData data, Endian numEndianess, int bytesPerSample) {
@@ -584,8 +598,8 @@ class Int32Storage extends IWavSamplesStorage {
   @override
   IWavSamplesStorage mixTogether(
       int totalLength, int numChannels, List<MixingInfo> mixInfo) {
-    var samplesData =
-        List.generate(numChannels, (index) => Int32List(totalLength));
+    var simdData = List.generate(numChannels, (index) => Int32x4List((totalLength + 3) ~/ 4));
+    var samplesData = List.generate(numChannels, (index) => Int32List.view(simdData[index].buffer, simdData[index].offsetInBytes, totalLength));
     for (var m in mixInfo) {
       if (m.input is! Int32Storage) {
         continue;
@@ -611,35 +625,17 @@ class Int32Storage extends IWavSamplesStorage {
         if (scale == 0) {
           continue;
         }
-        if (scale == 1) {
-          for (int s = 0; s < actualLength; ++s) {
-            outputChannel[chm.offsetOutput + s] =
-                (inputChannel[chm.offsetSource + s] +
-                        outputChannel[chm.offsetOutput + s])
-                    .clamp(-2147483648, 2147483647);
-          }
-        } else {
-          int intScale = (scale * (1 << 16)).toInt();
-          for (int s = 0; s < actualLength; ++s) {
-            outputChannel[chm.offsetOutput + s] =
-                ((inputChannel[chm.offsetSource + s] * intScale >> 16) +
-                        outputChannel[chm.offsetOutput + s])
-                    .clamp(-2147483648, 2147483647);
-          }
-        }
+        _mixInt32Simd(inputChannel, outputChannel, chm.offsetSource, chm.offsetOutput, actualLength, scale);
       }
     }
-    return Int32Storage(samplesData, totalLength);
+    return Int32Storage(samplesData, totalLength, simdData);
   }
 
   @override
   Float32Storage convertToFloat32() {
-    return Float32Storage(
-        List<Float32List>.generate(
-            samplesData.length,
-            (index) =>
-                IWavSamplesStorage._int32ListToFloat32(samplesData[index])),
-        samplesPerChannel);
+    var converted = List.generate(samplesData.length, (index) => IWavSamplesStorage._int32ListToFloat32(samplesData[index]));
+    var simdData = converted.map((c) => Float32x4List.view(c.buffer, c.offsetInBytes, (c.buffer.lengthInBytes - c.offsetInBytes) ~/ 16)).toList();
+    return Float32Storage(converted, samplesPerChannel, simdData);
   }
 
   @override
@@ -654,20 +650,21 @@ class Int32Storage extends IWavSamplesStorage {
 
   @override
   Int32Storage convertToInt32() {
-    return Int32Storage(
-        List<Int32List>.generate(samplesData.length,
-            (index) => Int32List.fromList(samplesData[index])),
-        samplesPerChannel);
+    var converted = List.generate(samplesData.length, (index) {
+      var simd = Int32x4List((samplesPerChannel + 3) ~/ 4);
+      var i32 = Int32List.view(simd.buffer, simd.offsetInBytes, samplesPerChannel);
+      i32.setAll(0, samplesData[index]);
+      return i32;
+    });
+    var simdData = converted.map((c) => Int32x4List.view(c.buffer, c.offsetInBytes, (c.buffer.lengthInBytes - c.offsetInBytes) ~/ 16)).toList();
+    return Int32Storage(converted, samplesPerChannel, simdData);
   }
 
   @override
   Float64Storage convertToFloat64() {
-    return Float64Storage(
-        List<Float64List>.generate(
-            samplesData.length,
-            (index) =>
-                IWavSamplesStorage._int32ListToFloat64(samplesData[index])),
-        samplesPerChannel);
+    var converted = List.generate(samplesData.length, (index) => IWavSamplesStorage._int32ListToFloat64(samplesData[index]));
+    var simdData = converted.map((c) => Float64x2List.view(c.buffer, c.offsetInBytes, (c.buffer.lengthInBytes - c.offsetInBytes) ~/ 16)).toList();
+    return Float64Storage(converted, samplesPerChannel, simdData);
   }
 
   @override
@@ -683,8 +680,9 @@ class Int32Storage extends IWavSamplesStorage {
 
 class Float64Storage extends IWavSamplesStorage {
   final List<Float64List> samplesData;
+  final List<Float64x2List>? simdData;
 
-  Float64Storage(this.samplesData, super.samplesPerChannel) {
+  Float64Storage(this.samplesData, super.samplesPerChannel, [this.simdData]) {
     if (!samplesData.every((element) => element.length == samplesPerChannel)) {
       throw ArgumentError('not all channels are with the same length');
     }
@@ -692,8 +690,10 @@ class Float64Storage extends IWavSamplesStorage {
   factory Float64Storage.fromBytes(
       int channels, ByteData data, Endian numEndianess) {
     int samplesPerChannel = data.lengthInBytes ~/ (channels * 8);
-    List<Float64List> samplesData =
-        List.generate(channels, (index) => Float64List(samplesPerChannel));
+    List<Float64x2List> simdData = List.generate(
+        channels, (index) => Float64x2List((samplesPerChannel + 1) ~/ 2));
+    List<Float64List> samplesData = List.generate(channels,
+        (index) => Float64List.view(simdData[index].buffer, simdData[index].offsetInBytes, samplesPerChannel));
     int currentDataOffset = 0;
     for (int s = 0; s < samplesPerChannel; ++s) {
       for (int ch = 0; ch < channels; ++ch) {
@@ -701,7 +701,7 @@ class Float64Storage extends IWavSamplesStorage {
         currentDataOffset += 8;
       }
     }
-    return Float64Storage(samplesData, samplesPerChannel);
+    return Float64Storage(samplesData, samplesPerChannel, simdData);
   }
 
   @override
@@ -722,8 +722,8 @@ class Float64Storage extends IWavSamplesStorage {
   @override
   IWavSamplesStorage mixTogether(
       int totalLength, int numChannels, List<MixingInfo> mixInfo) {
-    var samplesData =
-        List.generate(numChannels, (index) => Float64List(totalLength));
+    var simdData = List.generate(numChannels, (index) => Float64x2List((totalLength + 1) ~/ 2));
+    var samplesData = List.generate(numChannels, (index) => Float64List.view(simdData[index].buffer, simdData[index].offsetInBytes, totalLength));
     for (var m in mixInfo) {
       if (m.input is! Float64Storage) {
         continue;
@@ -746,38 +746,34 @@ class Float64Storage extends IWavSamplesStorage {
         if (scale == 0) {
           continue;
         }
-        if (scale == 1) {
-          for (int s = 0; s < actualLength; ++s) {
-            outputChannel[chm.offsetOutput + s] =
-                (inputChannel[chm.offsetSource + s] +
-                    outputChannel[chm.offsetOutput + s]);
-          }
-        } else {
-          for (int s = 0; s < actualLength; ++s) {
-            outputChannel[chm.offsetOutput + s] =
-                ((inputChannel[chm.offsetSource + s] * scale) +
-                    outputChannel[chm.offsetOutput + s]);
-          }
-        }
+        _mixFloat64Simd(inputChannel, outputChannel, chm.offsetSource, chm.offsetOutput, actualLength, scale);
       }
     }
-    return Float64Storage(samplesData, totalLength);
+    return Float64Storage(samplesData, totalLength, simdData);
   }
 
   @override
   Float64Storage convertToFloat64() {
-    return Float64Storage(
-        List<Float64List>.generate(samplesData.length,
-            (index) => Float64List.fromList(samplesData[index])),
-        samplesPerChannel);
+    var converted = List.generate(samplesData.length, (index) {
+      var simd = Float64x2List((samplesPerChannel + 1) ~/ 2);
+      var f64 = Float64List.view(simd.buffer, simd.offsetInBytes, samplesPerChannel);
+      f64.setAll(0, samplesData[index]);
+      return f64;
+    });
+    var simdData = converted.map((c) => Float64x2List.view(c.buffer, c.offsetInBytes, (c.buffer.lengthInBytes - c.offsetInBytes) ~/ 16)).toList();
+    return Float64Storage(converted, samplesPerChannel, simdData);
   }
 
   @override
   Float32Storage convertToFloat32() {
-    return Float32Storage(
-        List<Float32List>.generate(samplesData.length,
-            (index) => Float32List.fromList(samplesData[index])),
-        samplesPerChannel);
+    var converted = List.generate(samplesData.length, (index) {
+      var simd = Float32x4List((samplesPerChannel + 3) ~/ 4);
+      var f32 = Float32List.view(simd.buffer, simd.offsetInBytes, samplesPerChannel);
+      f32.setAll(0, samplesData[index]);
+      return f32;
+    });
+    var simdData = converted.map((c) => Float32x4List.view(c.buffer, c.offsetInBytes, (c.buffer.lengthInBytes - c.offsetInBytes) ~/ 16)).toList();
+    return Float32Storage(converted, samplesPerChannel, simdData);
   }
 
   @override
@@ -792,12 +788,15 @@ class Float64Storage extends IWavSamplesStorage {
 
   @override
   Int32Storage convertToInt32() {
-    return Int32Storage(
-        List<Int32List>.generate(
-            samplesData.length,
-            (index) =>
-                IWavSamplesStorage._float64ListToInt32(samplesData[index])),
-        samplesPerChannel);
+    var converted = List.generate(samplesData.length, (index) => IWavSamplesStorage._float64ListToInt32(samplesData[index]));
+
+
+
+    var simdData = List.generate(samplesData.length, (index) {
+        var c = converted[index];
+        return Int32x4List.view(c.buffer, c.offsetInBytes, (c.buffer.lengthInBytes - c.offsetInBytes) ~/ 16);
+    });
+    return Int32Storage(converted, samplesPerChannel, simdData);
   }
 
   @override
@@ -813,8 +812,9 @@ class Float64Storage extends IWavSamplesStorage {
 
 class Float32Storage extends IWavSamplesStorage {
   final List<Float32List> samplesData;
+  final List<Float32x4List>? simdData;
 
-  Float32Storage(this.samplesData, super.samplesPerChannel) {
+  Float32Storage(this.samplesData, super.samplesPerChannel, [this.simdData]) {
     if (!samplesData.every((element) => element.length == samplesPerChannel)) {
       throw ArgumentError('not all channels are with the same length');
     }
@@ -823,8 +823,10 @@ class Float32Storage extends IWavSamplesStorage {
   factory Float32Storage.fromBytes(
       int channels, ByteData data, Endian numEndianess) {
     int samplesPerChannel = data.lengthInBytes ~/ (channels * 4);
-    List<Float32List> samplesData =
-        List.generate(channels, (index) => Float32List(samplesPerChannel));
+    List<Float32x4List> simdData = List.generate(
+        channels, (index) => Float32x4List((samplesPerChannel + 3) ~/ 4));
+    List<Float32List> samplesData = List.generate(channels,
+        (index) => Float32List.view(simdData[index].buffer, simdData[index].offsetInBytes, samplesPerChannel));
     int currentDataOffset = 0;
     for (int s = 0; s < samplesPerChannel; ++s) {
       for (int ch = 0; ch < channels; ++ch) {
@@ -832,7 +834,7 @@ class Float32Storage extends IWavSamplesStorage {
         currentDataOffset += 4;
       }
     }
-    return Float32Storage(samplesData, samplesPerChannel);
+    return Float32Storage(samplesData, samplesPerChannel, simdData);
   }
   @override
   void writeStorage(ByteData data, Endian numEndianess, int bytesPerSample) {
@@ -852,8 +854,8 @@ class Float32Storage extends IWavSamplesStorage {
   @override
   IWavSamplesStorage mixTogether(
       int totalLength, int numChannels, List<MixingInfo> mixInfo) {
-    var samplesData =
-        List.generate(numChannels, (index) => Float32List(totalLength));
+    var simdData = List.generate(numChannels, (index) => Float32x4List((totalLength + 3) ~/ 4));
+    var samplesData = List.generate(numChannels, (index) => Float32List.view(simdData[index].buffer, simdData[index].offsetInBytes, totalLength));
     for (var m in mixInfo) {
       if (m.input is! Float32Storage) {
         continue;
@@ -876,38 +878,34 @@ class Float32Storage extends IWavSamplesStorage {
         if (scale == 0) {
           continue;
         }
-        if (scale == 1) {
-          for (int s = 0; s < actualLength; ++s) {
-            outputChannel[chm.offsetOutput + s] =
-                (inputChannel[chm.offsetSource + s] +
-                    outputChannel[chm.offsetOutput + s]);
-          }
-        } else {
-          for (int s = 0; s < actualLength; ++s) {
-            outputChannel[chm.offsetOutput + s] =
-                ((inputChannel[chm.offsetSource + s] * scale) +
-                    outputChannel[chm.offsetOutput + s]);
-          }
-        }
+        _mixFloat32Simd(inputChannel, outputChannel, chm.offsetSource, chm.offsetOutput, actualLength, scale);
       }
     }
-    return Float32Storage(samplesData, totalLength);
+    return Float32Storage(samplesData, totalLength, simdData);
   }
 
   @override
   Float32Storage convertToFloat32() {
-    return Float32Storage(
-        List<Float32List>.generate(samplesData.length,
-            (index) => Float32List.fromList(samplesData[index])),
-        samplesPerChannel);
+    var converted = List.generate(samplesData.length, (index) {
+      var simd = Float32x4List((samplesPerChannel + 3) ~/ 4);
+      var f32 = Float32List.view(simd.buffer, simd.offsetInBytes, samplesPerChannel);
+      for(int i=0; i<samplesPerChannel; i++) f32[i] = samplesData[index][i];
+      return f32;
+    });
+    var simdData = converted.map((c) => Float32x4List.view(c.buffer, c.offsetInBytes, (c.buffer.lengthInBytes - c.offsetInBytes) ~/ 16)).toList();
+    return Float32Storage(converted, samplesPerChannel, simdData);
   }
 
   @override
   Float64Storage convertToFloat64() {
-    return Float64Storage(
-        List<Float64List>.generate(samplesData.length,
-            (index) => Float64List.fromList(samplesData[index])),
-        samplesPerChannel);
+    var converted = List.generate(samplesData.length, (index) {
+      var simd = Float64x2List((samplesPerChannel + 1) ~/ 2);
+      var f64 = Float64List.view(simd.buffer, simd.offsetInBytes, samplesPerChannel);
+      f64.setAll(0, samplesData[index]);
+      return f64;
+    });
+    var simdData = converted.map((c) => Float64x2List.view(c.buffer, c.offsetInBytes, (c.buffer.lengthInBytes - c.offsetInBytes) ~/ 16)).toList();
+    return Float64Storage(converted, samplesPerChannel, simdData);
   }
 
   @override
@@ -922,12 +920,9 @@ class Float32Storage extends IWavSamplesStorage {
 
   @override
   Int32Storage convertToInt32() {
-    return Int32Storage(
-        List<Int32List>.generate(
-            samplesData.length,
-            (index) =>
-                IWavSamplesStorage._float32ListToInt32(samplesData[index])),
-        samplesPerChannel);
+    var converted = List.generate(samplesData.length, (index) => IWavSamplesStorage._float32ListToInt32(samplesData[index]));
+    var simdData = converted.map((c) => Int32x4List.view(c.buffer, c.offsetInBytes, (c.buffer.lengthInBytes - c.offsetInBytes) ~/ 16)).toList();
+    return Int32Storage(converted, samplesPerChannel, simdData);
   }
 
   @override
@@ -938,5 +933,102 @@ class Float32Storage extends IWavSamplesStorage {
             (index) =>
                 IWavSamplesStorage._float32ListToUint8(samplesData[index])),
         samplesPerChannel);
+  }
+}
+
+void _mixInt32Simd(Int32List inputChannel, Int32List outputChannel, int offsetSource, int offsetOutput, int actualLength, double scale) {
+  // SIMD Int32x4 does not support clamping natively without severe performance hits (creating new objects),
+  // so we revert to scalar processing for the mix loop, but the buffers remain SIMD aligned.
+  if (scale == 1.0) {
+    for (int s = 0; s < actualLength; ++s) {
+      outputChannel[offsetOutput + s] = (inputChannel[offsetSource + s] + outputChannel[offsetOutput + s]).clamp(-2147483648, 2147483647);
+    }
+  } else {
+    int intScale = (scale * (1 << 16)).toInt();
+    for (int s = 0; s < actualLength; ++s) {
+      outputChannel[offsetOutput + s] = (((inputChannel[offsetSource + s] * intScale) >> 16) + outputChannel[offsetOutput + s]).clamp(-2147483648, 2147483647);
+    }
+  }
+}
+
+
+
+void _mixFloat32Simd(Float32List inputChannel, Float32List outputChannel, int offsetSource, int offsetOutput, int actualLength, double scale) {
+  int s = 0;
+  if (offsetSource % 4 == offsetOutput % 4) {
+    int alignOffset = (4 - (offsetSource % 4)) % 4;
+    int preLoop = min(alignOffset, actualLength);
+    for (; s < preLoop; ++s) {
+      if (scale == 1) {
+        outputChannel[offsetOutput + s] = inputChannel[offsetSource + s] + outputChannel[offsetOutput + s];
+      } else {
+        outputChannel[offsetOutput + s] = (inputChannel[offsetSource + s] * scale) + outputChannel[offsetOutput + s];
+      }
+    }
+
+    int simdLength = (actualLength - s) ~/ 4;
+    if (simdLength > 0) {
+      var inSimd = Float32x4List.view(inputChannel.buffer, inputChannel.offsetInBytes + (offsetSource + s) * 4, simdLength);
+      var outSimd = Float32x4List.view(outputChannel.buffer, outputChannel.offsetInBytes + (offsetOutput + s) * 4, simdLength);
+      if (scale == 1) {
+        for (int i = 0; i < simdLength; ++i) {
+           outSimd[i] = inSimd[i] + outSimd[i];
+        }
+      } else {
+        var simdScale = Float32x4.splat(scale);
+        for (int i = 0; i < simdLength; ++i) {
+           outSimd[i] = (inSimd[i] * simdScale) + outSimd[i];
+        }
+      }
+      s += simdLength * 4;
+    }
+  }
+
+  for (; s < actualLength; ++s) {
+    if (scale == 1) {
+      outputChannel[offsetOutput + s] = inputChannel[offsetSource + s] + outputChannel[offsetOutput + s];
+    } else {
+      outputChannel[offsetOutput + s] = (inputChannel[offsetSource + s] * scale) + outputChannel[offsetOutput + s];
+    }
+  }
+}
+
+void _mixFloat64Simd(Float64List inputChannel, Float64List outputChannel, int offsetSource, int offsetOutput, int actualLength, double scale) {
+  int s = 0;
+  if (offsetSource % 2 == offsetOutput % 2) {
+    int alignOffset = (2 - (offsetSource % 2)) % 2;
+    int preLoop = min(alignOffset, actualLength);
+    for (; s < preLoop; ++s) {
+      if (scale == 1) {
+        outputChannel[offsetOutput + s] = inputChannel[offsetSource + s] + outputChannel[offsetOutput + s];
+      } else {
+        outputChannel[offsetOutput + s] = (inputChannel[offsetSource + s] * scale) + outputChannel[offsetOutput + s];
+      }
+    }
+
+    int simdLength = (actualLength - s) ~/ 2;
+    if (simdLength > 0) {
+      var inSimd = Float64x2List.view(inputChannel.buffer, inputChannel.offsetInBytes + (offsetSource + s) * 8, simdLength);
+      var outSimd = Float64x2List.view(outputChannel.buffer, outputChannel.offsetInBytes + (offsetOutput + s) * 8, simdLength);
+      if (scale == 1) {
+        for (int i = 0; i < simdLength; ++i) {
+           outSimd[i] = inSimd[i] + outSimd[i];
+        }
+      } else {
+        var simdScale = Float64x2.splat(scale);
+        for (int i = 0; i < simdLength; ++i) {
+           outSimd[i] = (inSimd[i] * simdScale) + outSimd[i];
+        }
+      }
+      s += simdLength * 2;
+    }
+  }
+
+  for (; s < actualLength; ++s) {
+    if (scale == 1) {
+      outputChannel[offsetOutput + s] = inputChannel[offsetSource + s] + outputChannel[offsetOutput + s];
+    } else {
+      outputChannel[offsetOutput + s] = (inputChannel[offsetSource + s] * scale) + outputChannel[offsetOutput + s];
+    }
   }
 }
