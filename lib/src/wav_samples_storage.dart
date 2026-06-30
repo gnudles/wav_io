@@ -292,12 +292,16 @@ class Uint8Storage extends IWavSamplesStorage {
         int actualLength = min(chm.length, totalLength - chm.offsetOutput);
         actualLength = min(actualLength, m.input.length - chm.offsetSource);
         int inChannelIndex = chm.fromChannel;
-        if (inChannelIndex < 0) {
+        if (inChannelIndex < 0 || inChannelIndex >= m.input.channels) {
+          continue;
+        }
+        int outChannelIndex = chm.toChannel;
+        if (outChannelIndex < 0 || outChannelIndex >= numChannels) {
           continue;
         }
         var inputChannel =
             (m.input as Uint8Storage).samplesData[inChannelIndex];
-        var outputChannel = samplesData[chm.toChannel];
+        var outputChannel = samplesData[outChannelIndex];
         double scale = chm.scale;
         if (scale.abs() > 128 || scale.abs() < (1 / 128)) {
           continue;
@@ -426,12 +430,16 @@ class Int16Storage extends IWavSamplesStorage {
         int actualLength = min(chm.length, totalLength - chm.offsetOutput);
         actualLength = min(actualLength, m.input.length - chm.offsetSource);
         int inChannelIndex = chm.fromChannel;
-        if (inChannelIndex < 0) {
+        if (inChannelIndex < 0 || inChannelIndex >= m.input.channels) {
+          continue;
+        }
+        int outChannelIndex = chm.toChannel;
+        if (outChannelIndex < 0 || outChannelIndex >= numChannels) {
           continue;
         }
         var inputChannel =
             (m.input as Int16Storage).samplesData[inChannelIndex];
-        var outputChannel = samplesData[chm.toChannel];
+        var outputChannel = samplesData[outChannelIndex];
         double scale = chm.scale;
         if (scale.abs() > 32768 || scale.abs() < (1 / 32768)) {
           continue;
@@ -586,12 +594,16 @@ class Int32Storage extends IWavSamplesStorage {
         int actualLength = min(chm.length, totalLength - chm.offsetOutput);
         actualLength = min(actualLength, m.input.length - chm.offsetSource);
         int inChannelIndex = chm.fromChannel;
-        if (inChannelIndex < 0) {
+        if (inChannelIndex < 0 || inChannelIndex >= m.input.channels) {
+          continue;
+        }
+        int outChannelIndex = chm.toChannel;
+        if (outChannelIndex < 0 || outChannelIndex >= numChannels) {
           continue;
         }
         var inputChannel =
             (m.input as Int32Storage).samplesData[inChannelIndex];
-        var outputChannel = samplesData[chm.toChannel];
+        var outputChannel = samplesData[outChannelIndex];
         double scale = chm.scale;
         if (scale.abs() > pow(2, 31) || scale.abs() < pow(2, -31)) {
           continue;
@@ -720,12 +732,16 @@ class Float64Storage extends IWavSamplesStorage {
         int actualLength = min(chm.length, totalLength - chm.offsetOutput);
         actualLength = min(actualLength, m.input.length - chm.offsetSource);
         int inChannelIndex = chm.fromChannel;
-        if (inChannelIndex < 0) {
+        if (inChannelIndex < 0 || inChannelIndex >= m.input.channels) {
+          continue;
+        }
+        int outChannelIndex = chm.toChannel;
+        if (outChannelIndex < 0 || outChannelIndex >= numChannels) {
           continue;
         }
         var inputChannel =
             (m.input as Float64Storage).samplesData[inChannelIndex];
-        var outputChannel = samplesData[chm.toChannel];
+        var outputChannel = samplesData[outChannelIndex];
         double scale = chm.scale;
         if (scale == 0) {
           continue;
@@ -846,12 +862,16 @@ class Float32Storage extends IWavSamplesStorage {
         int actualLength = min(chm.length, totalLength - chm.offsetOutput);
         actualLength = min(actualLength, m.input.length - chm.offsetSource);
         int inChannelIndex = chm.fromChannel;
-        if (inChannelIndex < 0) {
+        if (inChannelIndex < 0 || inChannelIndex >= m.input.channels) {
+          continue;
+        }
+        int outChannelIndex = chm.toChannel;
+        if (outChannelIndex < 0 || outChannelIndex >= numChannels) {
           continue;
         }
         var inputChannel =
             (m.input as Float32Storage).samplesData[inChannelIndex];
-        var outputChannel = samplesData[chm.toChannel];
+        var outputChannel = samplesData[outChannelIndex];
         double scale = chm.scale;
         if (scale == 0) {
           continue;
