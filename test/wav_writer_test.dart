@@ -133,5 +133,103 @@ void main() {
         expect(saveWavBytes[i], 0);
       }
     });
+
+    test('writes pcm8 format with WavWriter', () {
+      final file = testFile.openSync(mode: FileMode.write);
+      final format = WavFormat(
+        2, // channels
+        22050, // sampleRate
+        2, // blockAlign (2 channels * 1 byte)
+        8, // validBitsPerSample
+        8, // containerBitsPerSample
+        FormatType.pcm8,
+        channelMask: SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT,
+      );
+
+      final writer = WavWriter(file, format, StorageType.uint8);
+      final chunk1 = Uint8Storage(3, 2);
+      chunk1.samplesData[0].setAll(0, [128, 0, 255]); // left channel
+      chunk1.samplesData[1].setAll(0, [128, 255, 0]); // right channel
+
+      writer.write(chunk1);
+      writer.close();
+
+      // Read back and verify
+      final bytes = testFile.readAsBytesSync();
+      final byteData = ByteData.sublistView(bytes);
+      final result = loadWav(byteData);
+      expect(result.isOk, isTrue);
+
+      final content = result.unwrap();
+      expect(content.numChannels, equals(2));
+      expect(content.sampleRate, equals(22050));
+      expect(content.bitsPerSample, equals(8));
+      expect(content.numSamples, equals(3));
+      expect(content.storageType, equals(StorageType.uint8));
+
+      final storage = content as WavContent<Uint8Storage>;
+      expect(storage.samplesStorage.samplesData[0], equals([128, 0, 255]));
+      expect(storage.samplesStorage.samplesData[1], equals([128, 255, 0]));
+    });
+
+    test('writes float32 format with WavWriter', () {
+      final file = testFile.openSync(mode: FileMode.write);
+      final format = WavFormat(
+        1,
+        44100,
+        4, // 1 channel * 4 bytes
+        32,
+        32,
+        FormatType.float32,
+        channelMask: SPEAKER_FRONT_CENTER,
+      );
+
+      final writer = WavWriter(file, format, StorageType.float32);
+      final chunk = Float32Storage(3, 1);
+      chunk.samplesData[0].setAll(0, [0.0, -1.0, 1.0]);
+
+      writer.write(chunk);
+      writer.close();
+
+      final bytes = testFile.readAsBytesSync();
+      final result = loadWav(ByteData.sublistView(bytes));
+      expect(result.isOk, isTrue);
+
+      final content = result.unwrap();
+      expect(content.numChannels, equals(1));
+      expect(content.sampleRate, equals(44100));
+      expect(content.bitsPerSample, equals(32));
+      expect(content.numSamples, equals(3));
+      expect(content.storageType, equals(StorageType.float32));
+
+      final storage = content as WavContent<Float32Storage>;
+      expect(storage.samplesStorage.samplesData[0][0], closeTo(0.0, 1e-5));
+      expect(storage.samplesStorage.samplesData[0][1], closeTo(-1.0, 1e-5));
+      expect(storage.samplesStorage.samplesData[0][2], closeTo(1.0, 1e-5));
+    });
+
+    test('throws StateError when writing to a closed writer', () {
+      final file = testFile.openSync(mode: FileMode.write);
+      final format = WavFormat(
+        1, 44100, 2, 16, 16, FormatType.pcm16
+      );
+      final writer = WavWriter(file, format, StorageType.int16);
+      writer.close();
+
+      final chunk = Int16Storage(1, 1);
+      expect(() => writer.write(chunk), throwsStateError);
+    });
+
+    test('throws ArgumentError on channel mismatch', () {
+      final file = testFile.openSync(mode: FileMode.write);
+      final format = WavFormat(
+        2, 44100, 4, 16, 16, FormatType.pcm16
+      );
+      final writer = WavWriter(file, format, StorageType.int16);
+
+      final chunk = Int16Storage(1, 1); // 1 channel instead of 2
+      expect(() => writer.write(chunk), throwsArgumentError);
+      writer.close();
+    });
   });
 }

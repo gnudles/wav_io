@@ -3,43 +3,112 @@ import 'dart:typed_data';
 
 import 'package:wav_io/src/byte_data_24bit.dart';
 
-enum FormatType { pcm8, pcm16, pcm24, pcm32, float32, float64 }
+/// The format of the WAV audio data on disk.
+enum FormatType {
+  /// Unsigned 8-bit PCM.
+  pcm8,
+  /// Signed 16-bit PCM.
+  pcm16,
+  /// Signed 24-bit PCM.
+  pcm24,
+  /// Signed 32-bit PCM.
+  pcm32,
+  /// 32-bit IEEE Floating-Point.
+  float32,
+  /// 64-bit IEEE Floating-Point.
+  float64
+}
 
-enum StorageType { uint8, int16, int32, float32, float64 }
+/// The internal representation / storage type of audio samples in memory.
+enum StorageType {
+  /// Samples stored as [Uint8List] (range 0 to 255).
+  uint8,
+  /// Samples stored as [Int16List] (range -32768 to 32767).
+  int16,
+  /// Samples stored as [Int32List] (range -2147483648 to 2147483647).
+  int32,
+  /// Samples stored as [Float32List] (range -1.0 to 1.0).
+  float32,
+  /// Samples stored as [Float64List] (range -1.0 to 1.0).
+  float64
+}
 
+/// Defines how a channel from a source audio storage is mapped to a target channel,
+/// including sample offset, length, and scaling factor.
 class ChannelMapping {
+  /// The source channel index.
   int fromChannel;
+  /// The target channel index.
   int toChannel;
+  /// The starting offset in the source channel.
   int offsetSource;
+  /// The number of samples to map.
   int length;
+  /// The starting offset in the target channel.
   int offsetOutput;
+  /// The amplitude scaling factor applied to mapped samples.
   double scale;
+
   ChannelMapping(this.fromChannel, this.toChannel, this.offsetSource,
       this.length, this.offsetOutput,
       [this.scale = 1.0]);
 }
 
+/// Contains an input storage source and a list of channel mappings to apply.
 class MixingInfo {
+  /// The source audio samples storage.
   IWavSamplesStorage input;
-  List<ChannelMapping>
-      channelMappings; // for every output channel, tell which input channel should be used.
+  /// The list of channel mappings from the input storage.
+  List<ChannelMapping> channelMappings;
+
   MixingInfo(this.input, this.channelMappings);
 }
 
+/// An abstract interface representing audio samples storage in memory.
 abstract class IWavSamplesStorage {
   IWavSamplesStorage(this.samplesPerChannel, this.channels);
+
+  /// Number of audio samples per channel.
   int samplesPerChannel;
+
+  /// Number of audio channels.
   int channels;
+
   static final Random _rGen = Random();
 
-  //IWavSamplesStorage mixWith(int offset, IWavSamplesStorage other);
-
+  /// Total number of samples per channel.
   int get length => samplesPerChannel;
+
+  /// Converts the underlying samples storage to 32-bit floating point storage.
+  ///
+  /// If [forceDuplication] is true, a new instance is guaranteed to be returned
+  /// even if the storage is already in float32.
   Float32Storage convertToFloat32({bool forceDuplication = false});
+
+  /// Converts the underlying samples storage to 64-bit floating point storage.
+  ///
+  /// If [forceDuplication] is true, a new instance is guaranteed to be returned
+  /// even if the storage is already in float64.
   Float64Storage convertToFloat64({bool forceDuplication = false});
+
+  /// Converts the underlying samples storage to signed 16-bit integer storage.
+  ///
+  /// [enableDithering] controls whether triangular probability density function
+  /// dithering is applied to reduce quantization distortion.
+  /// If [forceDuplication] is true, a new instance is guaranteed to be returned.
   Int16Storage convertToInt16(
       {bool enableDithering = false, bool forceDuplication = false});
+
+  /// Converts the underlying samples storage to signed 32-bit integer storage.
+  ///
+  /// If [forceDuplication] is true, a new instance is guaranteed to be returned.
   Int32Storage convertToInt32({bool forceDuplication = false});
+
+  /// Converts the underlying samples storage to unsigned 8-bit integer storage.
+  ///
+  /// [enableDithering] controls whether triangular probability density function
+  /// dithering is applied to reduce quantization distortion.
+  /// If [forceDuplication] is true, a new instance is guaranteed to be returned.
   Uint8Storage convertToUint8(
       {bool enableDithering = false, bool forceDuplication = false});
 
@@ -52,6 +121,9 @@ abstract class IWavSamplesStorage {
   /// storage types that do not match the expected underlying type.
   IWavSamplesStorage mixTogether(
       int totalLength, int numChannels, List<MixingInfo> mixInfo);
+
+  /// Writes the underlying samples data into [data] as bytes, conforming to
+  /// the specified endianness and [bytesPerSample].
   void writeStorage(ByteData data, Endian numEndianess, int bytesPerSample);
 
   static void _int16ListToFloat32(Int16List list, Float32List out) {
@@ -205,7 +277,7 @@ abstract class IWavSamplesStorage {
       }
     } else {
       for (int i = 0; i < length; ++i) {
-        out[i] = (list[i] + totalShift).clamp(0, 255);
+        out[i] = ((list[i] + totalShift) >> 8).clamp(0, 255);
       }
     }
   }
@@ -267,16 +339,25 @@ abstract class IWavSamplesStorage {
   }
 }
 
+/// Storage for audio samples represented as unsigned 8-bit integers (PCM 8-bit format).
+///
+/// Under this storage, values range from 0 to 255, where 128 represents silence (zero amplitude).
 class Uint8Storage extends IWavSamplesStorage {
+  /// The audio samples data list per channel.
   final List<Uint8List> samplesData;
 
+  /// Creates a new empty [Uint8Storage] with the specified length and channels.
   Uint8Storage(super.samplesPerChannel, super.channels)
       : samplesData =
             List.generate(channels, (index) => Uint8List(samplesPerChannel));
+
+  /// Creates a new [Uint8Storage] by copying data from the given lists of samples.
   Uint8Storage.fromSamples(
       super.samplesPerChannel, super.channels, List<Uint8List> sourceSamples)
       : samplesData = List.generate(
             channels, (index) => Uint8List.fromList(sourceSamples[index]));
+
+  /// Parses bytes from [data] to reconstruct a [Uint8Storage] instance.
   factory Uint8Storage.fromBytes(
       int channels, ByteData data, Endian numEndianess) {
     int samplesPerChannel = data.lengthInBytes ~/ channels;
@@ -304,6 +385,7 @@ class Uint8Storage extends IWavSamplesStorage {
     }
   }
 
+  /// Helper to mix together 8-bit unsigned integer samples.
   static IWavSamplesStorage mixTogetherU8(
       int totalLength, int numChannels, List<MixingInfo> mixInfo) {
     var storage = Uint8Storage(totalLength, numChannels);
@@ -419,16 +501,25 @@ class Uint8Storage extends IWavSamplesStorage {
   }
 }
 
+/// Storage for audio samples represented as signed 16-bit integers (PCM 16-bit format).
+///
+/// Under this storage, values range from -32768 to 32767, where 0 represents silence.
 class Int16Storage extends IWavSamplesStorage {
+  /// The audio samples data list per channel.
   final List<Int16List> samplesData;
 
+  /// Creates a new empty [Int16Storage] with the specified length and channels.
   Int16Storage(super.samplesPerChannel, super.channels)
       : samplesData =
             List.generate(channels, (index) => Int16List(samplesPerChannel));
+
+  /// Creates a new [Int16Storage] by copying data from the given lists of samples.
   Int16Storage.fromSamples(
       super.samplesPerChannel, super.channels, List<Int16List> sourceSamples)
       : samplesData = List.generate(
             channels, (index) => Int16List.fromList(sourceSamples[index]));
+
+  /// Parses bytes from [data] to reconstruct an [Int16Storage] instance.
   factory Int16Storage.fromBytes(
       int channels, ByteData data, Endian numEndianess) {
     int samplesPerChannel = data.lengthInBytes ~/ (channels * 2);
@@ -456,6 +547,7 @@ class Int16Storage extends IWavSamplesStorage {
     }
   }
 
+  /// Helper to mix together 16-bit signed integer samples.
   static IWavSamplesStorage mixTogetherI16(
       int totalLength, int numChannels, List<MixingInfo> mixInfo) {
     Int16Storage storage = Int16Storage(totalLength, numChannels);
@@ -563,10 +655,18 @@ class Int16Storage extends IWavSamplesStorage {
   }
 }
 
+/// Storage for audio samples represented as signed 32-bit integers (PCM 24-bit or 32-bit formats).
+///
+/// Under this storage, values range from -2147483648 to 2147483647, where 0 represents silence.
+/// It uses SIMD ([Int32x4List]) for performance optimizations.
 class Int32Storage extends IWavSamplesStorage {
+  /// The underlying SIMD data block.
   final List<Int32x4List> simdData;
+
+  /// The audio samples data list per channel, backed by the SIMD list.
   late final List<Int32List> samplesData;
 
+  /// Creates a new empty [Int32Storage] with the specified length and channels.
   Int32Storage(super.samplesPerChannel, super.channels)
       : simdData = List.generate(
             channels, (index) => Int32x4List((samplesPerChannel + 3) ~/ 4)) {
@@ -575,6 +675,8 @@ class Int32Storage extends IWavSamplesStorage {
         (index) => Int32List.view(simdData[index].buffer,
             simdData[index].offsetInBytes, samplesPerChannel));
   }
+
+  /// Creates a new [Int32Storage] by copying data from the given lists of SIMD samples.
   Int32Storage.fromSamples(super.samplesPerChannel, super.channels,
       List<Int32x4List> sourceSimdSamples)
       : simdData = List.generate(channels,
@@ -755,10 +857,18 @@ class Int32Storage extends IWavSamplesStorage {
   }
 }
 
+/// Storage for audio samples represented as 64-bit IEEE floating-point numbers.
+///
+/// Under this storage, values normally range from -1.0 to 1.0, where 0.0 represents silence.
+/// It uses SIMD ([Float64x2List]) for performance optimizations.
 class Float64Storage extends IWavSamplesStorage {
+  /// The underlying SIMD data block.
   final List<Float64x2List> simdData;
+
+  /// The audio samples data list per channel, backed by the SIMD list.
   late final List<Float64List> samplesData;
 
+  /// Creates a new empty [Float64Storage] with the specified length and channels.
   Float64Storage(super.samplesPerChannel, super.channels)
       : simdData = List.generate(
             channels, (index) => Float64x2List((samplesPerChannel + 1) ~/ 2)) {
@@ -767,6 +877,8 @@ class Float64Storage extends IWavSamplesStorage {
         (index) => Float64List.view(simdData[index].buffer,
             simdData[index].offsetInBytes, samplesPerChannel));
   }
+
+  /// Creates a new [Float64Storage] by copying data from the given lists of SIMD samples.
   Float64Storage.fromSamples(super.samplesPerChannel, super.channels,
       List<Float64x2List> sourceSimdSamples)
       : simdData = List.generate(channels,
@@ -776,6 +888,8 @@ class Float64Storage extends IWavSamplesStorage {
         (index) => Float64List.view(simdData[index].buffer,
             simdData[index].offsetInBytes, samplesPerChannel));
   }
+
+  /// Parses bytes from [data] to reconstruct a [Float64Storage] instance.
   factory Float64Storage.fromBytes(
       int channels, ByteData data, Endian numEndianess) {
     int samplesPerChannel = data.lengthInBytes ~/ (channels * 8);
@@ -803,6 +917,7 @@ class Float64Storage extends IWavSamplesStorage {
     }
   }
 
+  /// Helper to mix together 64-bit floating point samples.
   static IWavSamplesStorage mixTogetherF64(
       int totalLength, int numChannels, List<MixingInfo> mixInfo) {
     Float64Storage storage = Float64Storage(totalLength, numChannels);
@@ -892,10 +1007,18 @@ class Float64Storage extends IWavSamplesStorage {
   }
 }
 
+/// Storage for audio samples represented as 32-bit IEEE floating-point numbers.
+///
+/// Under this storage, values normally range from -1.0 to 1.0, where 0.0 represents silence.
+/// It uses SIMD ([Float32x4List]) for performance optimizations.
 class Float32Storage extends IWavSamplesStorage {
+  /// The underlying SIMD data block.
   final List<Float32x4List> simdData;
+
+  /// The audio samples data list per channel, backed by the SIMD list.
   late final List<Float32List> samplesData;
 
+  /// Creates a new empty [Float32Storage] with the specified length and channels.
   Float32Storage(super.samplesPerChannel, super.channels)
       : simdData = List.generate(
             channels, (index) => Float32x4List((samplesPerChannel + 3) ~/ 4)) {
@@ -904,6 +1027,8 @@ class Float32Storage extends IWavSamplesStorage {
         (index) => Float32List.view(simdData[index].buffer,
             simdData[index].offsetInBytes, samplesPerChannel));
   }
+
+  /// Creates a new [Float32Storage] by copying data from the given lists of SIMD samples.
   Float32Storage.fromSamples(super.samplesPerChannel, super.channels,
       List<Float32x4List> sourceSimdSamples)
       : simdData = List.generate(channels,

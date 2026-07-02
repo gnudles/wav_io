@@ -150,6 +150,10 @@ class Chunk {
 
 int roundUp2(int x) => (x + 1) & (~1);
 
+/// Decodes WAV audio from the given [data] byte buffer.
+///
+/// Returns a [Result] containing the parsed [IWavContent] on success,
+/// or a [WavParsingError] on failure.
 Result<IWavContent, WavParsingError> loadWav(ByteData data) {
   if (data.lengthInBytes <= 44) {
     return Result.error(WavParsingError.bufferIsTooSmall);
@@ -226,7 +230,7 @@ Result<IWavContent, WavParsingError> loadWav(ByteData data) {
     return Result.error(WavParsingError.noFmtSubChunk);
   }
   late IWavSamplesStorage samplesStorage;
-  //StorageType storageType = wavFormat.recommandedStorageType;
+  //StorageType storageType = wavFormat.recommendedStorageType;
 
   {
     Chunk data = subChunks.firstWhere((sck) => sck.type == data_ID);
@@ -293,7 +297,8 @@ Result<IWavContent, WavParsingError> loadWav(ByteData data) {
   return Result.error(WavParsingError.unexpectedError);
 }
 
-FormatType recommandedFormatType(int wFormatTag, int bitsPerSample) {
+/// Suggests a recommended [FormatType] given a format tag and bits-per-sample depth.
+FormatType recommendedFormatType(int wFormatTag, int bitsPerSample) {
   if (wFormatTag == WAVE_FORMAT_PCM) {
     if (bitsPerSample <= 8) {
       return FormatType.pcm8;
@@ -403,7 +408,7 @@ Result<WavFormat, WavParsingError> parseFmt(
     return Result.error(WavParsingError.invalidBitsPerSample);
   }
   FormatType storageType =
-      recommandedFormatType(wFormatTagActual, bitsPerSample);
+      recommendedFormatType(wFormatTagActual, bitsPerSample);
   return Result.ok(WavFormat(numChannels, sampleRate, blockAlign,
       validBitsPerSample, bytesPerSample * 8, storageType,
       channelMask: channelMask));
@@ -480,6 +485,10 @@ Result<ListInfo, WavParsingError> parseListChunk(
       infoEntries[ITRK_ID] ?? ""));
 }
 
+/// Construct and write a WAV header into a [ByteData] buffer.
+///
+/// Under the hood, this sets up the RIFF/RIFX header container structure, the
+/// `fmt` subchunk, the `fact` subchunk, and prepends the `data` subchunk header.
 ByteData writeWavHeader(
     WavFormat format, StorageType storageType, int numSamples,
     {ListInfo? info, bool extensible = true, bool bigEndian = false}) {
@@ -526,10 +535,10 @@ ByteData writeWavHeader(
   return data;
 }
 
-/// Takes the wav content and convert it to ByteData.
-/// The extensible flag tells whether to use the extended Fmt subchunk,
-/// (defaults to true). This extended format is important because it stores the
-/// integer of channel mask.
+/// Encodes [wavContent] into WAV format bytes stored in [ByteData].
+///
+/// [extensible] determines whether the extended `fmt` format should be used.
+/// [bigEndian] determines if it should be encoded in big-endian (RIFX) format.
 ByteData saveWav(IWavContent wavContent,
     [bool extensible = true, bool bigEndian = false]) {
   int dataCkSize = wavContent.format.blockAlign * wavContent.numSamples;
@@ -582,6 +591,7 @@ ByteData saveWav(IWavContent wavContent,
   return data;
 }
 
+/// Helper that serializes format metadata parameters into the `fmt` chunk byte data block.
 void writeFmt(ByteData data, bool extensible, WavFormat format,
     StorageType storageType, Endian numEndianess) {
   int wFormatTag;
