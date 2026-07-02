@@ -139,43 +139,91 @@ enum WavParsingError {
   unexpectedError
 }
 
-class Chunk {
-  /// four bytes of the type as big endian integer
-  int type;
-  int offset;
-  int length;
-  ByteData view;
-  Chunk(this.type, this.offset, this.length, this.view);
-}
 
 int roundUp2(int x) => (x + 1) & (~1);
 
-Result<IWavContent, WavParsingError> loadWav(ByteData data) {
-  if (data.lengthInBytes <= 44) {
+/// An interface to retrieve raw WAV header bytes from either memory buffers or files.
+abstract class WavHeaderInput {
+  /// Reads a 32-bit unsigned integer at [offset] using the specified [endian] byte order.
+  int getUint32(int offset, Endian endian);
+
+  /// Returns a [ByteData] view of the raw bytes starting at [offset] for [length] bytes.
+  ByteData getByteData(int offset, int length);
+
+  /// The total size of the input source.
+  int get length;
+}
+
+/// A [WavHeaderInput] implementation wrapping a memory buffer of [ByteData].
+class ByteDataHeaderInput implements WavHeaderInput {
+  final ByteData data;
+  ByteDataHeaderInput(this.data);
+
+  @override
+  int getUint32(int offset, Endian endian) => data.getUint32(offset, endian);
+
+  @override
+  ByteData getByteData(int offset, int length) =>
+      data.buffer.asByteData(data.offsetInBytes + offset, length);
+
+  @override
+  int get length => data.lengthInBytes;
+}
+
+/// Container representing the parsed header metadata structure of a WAV file.
+class ParsedWavHeader {
+  final Endian numEndianness;
+  final WavFormat format;
+  final ListInfo? info;
+  final int dataOffset;
+  final int dataSize;
+
+  ParsedWavHeader({
+    required this.numEndianness,
+    required this.format,
+    this.info,
+    required this.dataOffset,
+    required this.dataSize,
+  });
+}
+
+class SubChunkInfo {
+  final int id;
+  final int offset;
+  final int size;
+  SubChunkInfo(this.id, this.offset, this.size);
+}
+
+/// Parses the WAV header structure from the given [input] source.
+Result<ParsedWavHeader, WavParsingError> parseWavHeader(WavHeaderInput input) {
+  if (input.length <= 44) {
     return Result.error(WavParsingError.bufferIsTooSmall);
   }
-  int ckID = data.getUint32(0, Endian.big); //intent. big endian
+  final int ckID = input.getUint32(0, Endian.big);
   if (ckID != RIFF_ID && ckID != RIFX_ID) {
     return Result.error(WavParsingError.notRiffChunk);
   }
 
-  Endian numEndianess = (ckID == RIFF_ID) ? Endian.little : Endian.big;
+  final Endian numEndianness = (ckID == RIFF_ID) ? Endian.little : Endian.big;
 
-  // ckSize may be odd, but a pad byte will be added to the data
-  int ckSize = data.getUint32(4, numEndianess);
-  if (roundUp2(ckSize) + 8 > data.lengthInBytes) {
+  final int ckSize = input.getUint32(4, numEndianness);
+  if (roundUp2(ckSize) + 8 > input.length) {
     return Result.error(WavParsingError.chunkSizeExceedsBuffer);
   }
 
-  int fmtId = data.getUint32(8, Endian.big);
+  final int fmtId = input.getUint32(8, Endian.big);
   if (fmtId != WAVE_ID) {
     return Result.error(WavParsingError.riffFormatIsNotWave);
   }
-  int overallSubChunks = 0; // starting after fmtId
-  int subChunksTotalSize = ckSize - 4;
-  int subChunksStart = 12;
-  List<Chunk> subChunks = [];
+
+  int overallSubChunks = 0;
+  final int subChunksTotalSize = ckSize - 4;
+  final int subChunksStart = 12;
   bool metDataChunk = false;
+  bool metCsetId = false;
+
+  final List<SubChunkInfo> subChunks = [];
+
   for (int i = 0;
       i < 20 && subChunksTotalSize != overallSubChunks;
       ++i) // maximum of 20 subchunks allowed (to spot corrupted files)
@@ -184,10 +232,11 @@ Result<IWavContent, WavParsingError> loadWav(ByteData data) {
     if (subChunksTotalSize - overallSubChunks < 8) {
       return Result.error(WavParsingError.chunkSizeDontAlignWithSubChunks);
     }
-    int subCkId = data.getUint32(subChunksStart + overallSubChunks, Endian.big);
+    final int subCkId =
+        input.getUint32(subChunksStart + overallSubChunks, Endian.big);
     overallSubChunks += 4;
-    int subCkSize =
-        data.getUint32(subChunksStart + overallSubChunks, numEndianess);
+    final int subCkSize =
+        input.getUint32(subChunksStart + overallSubChunks, numEndianness);
     overallSubChunks += 4;
     if (subChunksTotalSize - overallSubChunks < subCkSize) {
       return Result.error(WavParsingError.subChunkExceedsChunkSize);
@@ -198,26 +247,26 @@ Result<IWavContent, WavParsingError> loadWav(ByteData data) {
       }
       metDataChunk = true;
     }
-    subChunks.add(Chunk(
-        subCkId,
-        subChunksStart + overallSubChunks,
-        subCkSize,
-        data.buffer.asByteData(
-            data.offsetInBytes + subChunksStart + overallSubChunks,
-            subCkSize)));
+    if (subCkId == CSET_ID) {
+      metCsetId = true;
+    }
+    subChunks.add(SubChunkInfo(
+        subCkId, subChunksStart + overallSubChunks, subCkSize));
     overallSubChunks += subCkSize;
   }
+
   if (subChunksTotalSize != overallSubChunks) {
     return Result.error(WavParsingError.chunkSizeDontAlignWithSubChunks);
   }
   if (metDataChunk == false) {
     return Result.error(WavParsingError.noDataSubChunk);
   }
-  late WavFormat wavFormat;
 
+  late final WavFormat wavFormat;
   try {
-    Chunk fmt = subChunks.firstWhere((sck) => sck.type == fmt_ID);
-    var result = parseFmt(fmt.view, numEndianess);
+    final fmtChunk = subChunks.firstWhere((sck) => sck.id == fmt_ID);
+    final fmtView = input.getByteData(fmtChunk.offset, fmtChunk.size);
+    final result = parseFmt(fmtView, numEndianness);
     if (result.isError) {
       return Result.error(result.error);
     }
@@ -225,26 +274,18 @@ Result<IWavContent, WavParsingError> loadWav(ByteData data) {
   } on StateError {
     return Result.error(WavParsingError.noFmtSubChunk);
   }
-  late IWavSamplesStorage samplesStorage;
-  //StorageType storageType = wavFormat.recommandedStorageType;
 
-  {
-    Chunk data = subChunks.firstWhere((sck) => sck.type == data_ID);
-    var result = parseDataChunk(data.view, numEndianess, wavFormat);
-    if (result.isError) {
-      return Result.error(result.error);
-    }
-    samplesStorage = result.unwrap();
-  }
+  final dataChunk = subChunks.firstWhere((sck) => sck.id == data_ID);
+  final int dataOffset = dataChunk.offset;
+  final int dataSize = dataChunk.size;
 
   ListInfo? listInfo;
-  if (subChunks.every((sck) =>
-      sck.type !=
-      CSET_ID)) // we do not support INFO list other than Ascii encoded
+  if (!metCsetId) // we do not support INFO list other than Ascii encoded
   {
     try {
-      Chunk list = subChunks.firstWhere((sck) => sck.type == LIST_ID);
-      var result = parseListChunk(list.view, numEndianess);
+      final listChunk = subChunks.firstWhere((sck) => sck.id == LIST_ID);
+      final listView = input.getByteData(listChunk.offset, listChunk.size);
+      final result = parseListChunk(listView, numEndianness);
       if (result.isOk) {
         listInfo = result.unwrap();
       } else {
@@ -254,33 +295,69 @@ Result<IWavContent, WavParsingError> loadWav(ByteData data) {
         }
       }
     } on StateError {
-      // no list info
+      //LIST chunk is optional
     }
   }
+
+  return Result.ok(ParsedWavHeader(
+    numEndianness: numEndianness,
+    format: wavFormat,
+    info: listInfo,
+    dataOffset: dataOffset,
+    dataSize: dataSize,
+  ));
+}
+
+/// Decodes WAV audio from the given [data] byte buffer.
+///
+/// Returns a [Result] containing the parsed [IWavContent] on success,
+/// or a [WavParsingError] on failure.
+Result<IWavContent, WavParsingError> loadWav(ByteData data) {
+  final input = ByteDataHeaderInput(data);
+  final headerResult = parseWavHeader(input);
+  if (headerResult.isError) {
+    return Result.error(headerResult.error);
+  }
+  final header = headerResult.unwrap();
+
+  final dataView = input.getByteData(header.dataOffset, header.dataSize);
+  final dataResult = parseDataChunk(dataView, header.numEndianness, header.format);
+  if (dataResult.isError) {
+    return Result.error(dataResult.error);
+  }
+  final samplesStorage = dataResult.unwrap();
+
   IWavContent? output;
   const formatToStorageConversion = [
+    StorageType.uint8,
     StorageType.int16,
     StorageType.int32,
     StorageType.int32,
     StorageType.float32,
     StorageType.float64
   ];
-  if (samplesStorage is Int16Storage) {
-    output = WavContent<Int16Storage>(wavFormat,
-        formatToStorageConversion[wavFormat.formatType.index], samplesStorage,
-        info: listInfo);
+  final storageType = formatToStorageConversion[header.format.formatType.index];
+
+  if (samplesStorage is Uint8Storage) {
+    output = WavContent<Uint8Storage>(
+        header.format, storageType, samplesStorage,
+        info: header.info);
+  } else if (samplesStorage is Int16Storage) {
+    output = WavContent<Int16Storage>(
+        header.format, storageType, samplesStorage,
+        info: header.info);
   } else if (samplesStorage is Int32Storage) {
-    output = WavContent<Int32Storage>(wavFormat,
-        formatToStorageConversion[wavFormat.formatType.index], samplesStorage,
-        info: listInfo);
+    output = WavContent<Int32Storage>(
+        header.format, storageType, samplesStorage,
+        info: header.info);
   } else if (samplesStorage is Float32Storage) {
-    output = WavContent<Float32Storage>(wavFormat,
-        formatToStorageConversion[wavFormat.formatType.index], samplesStorage,
-        info: listInfo);
+    output = WavContent<Float32Storage>(
+        header.format, storageType, samplesStorage,
+        info: header.info);
   } else if (samplesStorage is Float64Storage) {
-    output = WavContent<Float64Storage>(wavFormat,
-        formatToStorageConversion[wavFormat.formatType.index], samplesStorage,
-        info: listInfo);
+    output = WavContent<Float64Storage>(
+        header.format, storageType, samplesStorage,
+        info: header.info);
   }
   if (output != null) {
     return Result.ok(output);
@@ -288,17 +365,23 @@ Result<IWavContent, WavParsingError> loadWav(ByteData data) {
   return Result.error(WavParsingError.unexpectedError);
 }
 
-FormatType recommandedFormatType(int wFormatTag, int bitsPerSample) {
+/// Suggests a recommended [FormatType] given a format tag and bits-per-sample depth.
+FormatType recommendedFormatType(int wFormatTag, int bitsPerSample) {
   if (wFormatTag == WAVE_FORMAT_PCM) {
-    if (bitsPerSample == 24) {
+    if (bitsPerSample <= 8) {
+      return FormatType.pcm8;
+    } else if (bitsPerSample <= 16) {
+      return FormatType.pcm16;
+    } else if (bitsPerSample <= 24) {
       return FormatType.pcm24;
-    } else if (bitsPerSample == 32) {
+    } else /* bitsPerSample <= 32 */ {
       return FormatType.pcm32;
     }
-    return FormatType.pcm16;
-  }
-  if (bitsPerSample <= 32) {
-    return FormatType.float32;
+  } else if (wFormatTag == WAVE_FORMAT_IEEE_FLOAT) {
+    if (bitsPerSample <= 32) {
+      return FormatType.float32;
+    }
+    return FormatType.float64;
   }
   return FormatType.float64;
 }
@@ -349,20 +432,12 @@ Result<WavFormat, WavParsingError> parseFmt(
 
   int bitsPerSample = data.getUint16(14, numEndianess);
   int validBitsPerSample = bitsPerSample;
-  if (bitsPerSample == 0 || bitsPerSample > 64)
-  {
+  if (bitsPerSample == 0 || bitsPerSample > 64) {
     return Result.error(WavParsingError.invalidBitsPerSample);
-  }
-  if (bitsPerSample <= 8)
-  {
-    return Result.error(WavParsingError.unsupportedBitsPerSample);
   }
   int bytesPerSample = blockAlign ~/ numChannels;
   int bytesPerSampleUp = (bitsPerSample + 7) ~/ 8;
-  if (blockAlign % numChannels != 0) {
-    return Result.error(WavParsingError.invalidBlockAlign);
-  }
-  if (bytesPerSample != bytesPerSampleUp) {
+  if (blockAlign % numChannels != 0 || bytesPerSample != bytesPerSampleUp) {
     return Result.error(WavParsingError.invalidBlockAlign);
   }
   if (byteRate != blockAlign * sampleRate) {
@@ -401,7 +476,7 @@ Result<WavFormat, WavParsingError> parseFmt(
     return Result.error(WavParsingError.invalidBitsPerSample);
   }
   FormatType storageType =
-      recommandedFormatType(wFormatTagActual, bitsPerSample);
+      recommendedFormatType(wFormatTagActual, bitsPerSample);
   return Result.ok(WavFormat(numChannels, sampleRate, blockAlign,
       validBitsPerSample, bytesPerSample * 8, storageType,
       channelMask: channelMask));
@@ -409,10 +484,15 @@ Result<WavFormat, WavParsingError> parseFmt(
 
 Result<IWavSamplesStorage, WavParsingError> parseDataChunk(
     ByteData data, Endian numEndianess, WavFormat wavFormat) {
-  if (data.lengthInBytes == 0 || data.lengthInBytes % wavFormat.blockAlign != 0) {
+  if (data.lengthInBytes == 0 ||
+      data.lengthInBytes % wavFormat.blockAlign != 0) {
     return Result.error(WavParsingError.invalidDataChunkSize);
   }
-  if (wavFormat.formatType == FormatType.pcm16 &&
+  if (wavFormat.formatType == FormatType.pcm8 &&
+      wavFormat.containerBitsPerSample == 8) {
+    return Result.ok(
+        Uint8Storage.fromBytes(wavFormat.numChannels, data, numEndianess));
+  } else if (wavFormat.formatType == FormatType.pcm16 &&
       wavFormat.containerBitsPerSample == 16) {
     return Result.ok(
         Int16Storage.fromBytes(wavFormat.numChannels, data, numEndianess));
@@ -473,6 +553,60 @@ Result<ListInfo, WavParsingError> parseListChunk(
       infoEntries[ITRK_ID] ?? ""));
 }
 
+/// Construct and write a WAV header into a [ByteData] buffer.
+///
+/// Under the hood, this sets up the RIFF/RIFX header container structure, the
+/// `fmt` subchunk, the `fact` subchunk, and prepends the `data` subchunk header.
+ByteData writeWavHeader(
+    WavFormat format, StorageType storageType, int numSamples,
+    {ListInfo? info, bool extensible = true, bool bigEndian = false}) {
+  int dataCkSize = format.blockAlign * numSamples;
+  int listCkSize = info?.sizeOnDisk ?? 0;
+
+  const fmtExCkSize = 40;
+  const fmtSimpleCkSize = 16;
+  int fmtSize = extensible ? fmtExCkSize : fmtSimpleCkSize;
+  const factCkSize = 4;
+  int ckSize = 4 + (fmtSize + 8) + (factCkSize + 8) + (dataCkSize + 8);
+  if (listCkSize > 0) {
+    ckSize = roundUp2(ckSize) + listCkSize + 8;
+  }
+  int headerSize = 20 + fmtSize + 12 + 8;
+
+  var data = ByteData(headerSize);
+
+  Endian numEndianess = bigEndian ? Endian.big : Endian.little;
+  data.setUint32(0, bigEndian ? RIFX_ID : RIFF_ID, Endian.big);
+  data.setUint32(4, ckSize, numEndianess);
+  data.setUint32(8, WAVE_ID, Endian.big);
+  data.setUint32(12, fmt_ID, Endian.big);
+
+  data.setUint32(16, fmtSize, numEndianess);
+  writeFmt(data.buffer.asByteData(20, fmtSize), extensible, format, storageType,
+      numEndianess);
+  int position = 20 + fmtSize;
+  //write Fact
+  {
+    data.setUint32(position, fact_ID, Endian.big);
+    data.setUint32(position + 4, factCkSize, numEndianess);
+    data.setUint32(position + 8, numSamples, numEndianess);
+    position += 12;
+  }
+
+  {
+    // write data chunk header
+    data.setUint32(position, data_ID, Endian.big);
+    data.setUint32(position + 4, dataCkSize, numEndianess);
+    position += 8;
+  }
+
+  return data;
+}
+
+/// Encodes [wavContent] into WAV format bytes stored in [ByteData].
+///
+/// [extensible] determines whether the extended `fmt` format should be used.
+/// [bigEndian] determines if it should be encoded in big-endian (RIFX) format.
 ByteData saveWav(IWavContent wavContent,
     [bool extensible = true, bool bigEndian = false]) {
   int dataCkSize = wavContent.format.blockAlign * wavContent.numSamples;
@@ -490,34 +624,24 @@ ByteData saveWav(IWavContent wavContent,
 
   var data = ByteData(totalFileSize);
 
+  // Write header using our new writeWavHeader
+  var header = writeWavHeader(
+      wavContent.format, wavContent.storageType, wavContent.numSamples,
+      info: wavContent.info, extensible: extensible, bigEndian: bigEndian);
+
+  data.buffer
+      .asUint8List()
+      .setRange(0, header.lengthInBytes, header.buffer.asUint8List());
+
   Endian numEndianess = bigEndian ? Endian.big : Endian.little;
-  data.setUint32(0, bigEndian ? RIFX_ID : RIFF_ID, Endian.big);
-  data.setUint32(4, ckSize, numEndianess);
-  data.setUint32(8, WAVE_ID, Endian.big);
-  data.setUint32(12, fmt_ID, Endian.big);
+  int position = header.lengthInBytes;
 
-  data.setUint32(16, fmtSize, numEndianess);
-  writeFmt(data.buffer.asByteData(20, fmtSize), extensible, wavContent.format,
-      wavContent.storageType, numEndianess);
-  int position = 20 + fmtSize;
-  //write Fact
-  {
-    data.setUint32(position, fact_ID, Endian.big);
-    data.setUint32(position + 4, factCkSize, numEndianess);
-    data.setUint32(position + 8, wavContent.numSamples, numEndianess);
-    position += 12;
-  }
+  // write data content
+  wavContent.exportStorageAsBytes(
+      data.buffer.asByteData(data.offsetInBytes + position, dataCkSize),
+      numEndianess);
+  position += roundUp2(dataCkSize);
 
-  {
-    // write data
-    data.setUint32(position, data_ID, Endian.big);
-    data.setUint32(position + 4, dataCkSize, numEndianess);
-    position += 8;
-    wavContent.exportStorageAsBytes(
-        data.buffer.asByteData(data.offsetInBytes + position, dataCkSize),
-        numEndianess);
-    position += roundUp2(dataCkSize);
-  }
   // write list info
   if (listCkSize > 0) {
     data.setUint32(position, LIST_ID, Endian.big);
@@ -535,6 +659,7 @@ ByteData saveWav(IWavContent wavContent,
   return data;
 }
 
+/// Helper that serializes format metadata parameters into the `fmt` chunk byte data block.
 void writeFmt(ByteData data, bool extensible, WavFormat format,
     StorageType storageType, Endian numEndianess) {
   int wFormatTag;
@@ -546,6 +671,7 @@ void writeFmt(ByteData data, bool extensible, WavFormat format,
         ? WAVE_FORMAT_IEEE_FLOAT
         : WAVE_FORMAT_PCM;
   }
+
   data.setUint16(0, wFormatTag, numEndianess);
   data.setUint16(2, format.numChannels, numEndianess);
   data.setUint32(4, format.sampleRate, numEndianess);

@@ -11,14 +11,21 @@ IWavContent loadFile(String filename) {
 void main() {
   group('wav_io load mono', () {
     var wav = loadFile("test/16bit_mono.wav");
+    var wav8b = loadFile("test/8bit_mono.wav");
 
     setUp(() {});
 
-    test('test variables', () {
+    test('test variables 16 bit', () {
       expect(wav.numChannels == 1, isTrue);
       expect(wav.bitsPerSample == 16, isTrue);
       expect(wav.sampleRate == 44100, isTrue);
       expect(wav.numSamples == 515, isTrue);
+    });
+    test('test variables 8 bit', () {
+      expect(wav8b.numChannels == 1, isTrue);
+      expect(wav8b.bitsPerSample == 8, isTrue);
+      expect(wav8b.sampleRate == 44100, isTrue);
+      expect(wav8b.numSamples == 515, isTrue);
     });
   });
   group('wav_io load stereo float and 24bit pcm', () {
