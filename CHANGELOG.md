@@ -25,3 +25,7 @@
 - Added quantization dithering (TPDF) when downsampling formats.
 - Refactored WAV header parsing into a unified, common parsing function.
 - Added new examples for audio reversing, streaming writes, and merging multi-channel to mono.
+
+## 3.0.1
+
+- Removed generated audio file
