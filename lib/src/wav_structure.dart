@@ -351,6 +351,11 @@ abstract class IWavContent {
     format.sampleRate = sampleRate;
   }
 
+  /// Reverses the audio samples in-place for all channels in this content.
+  void reverse() {
+    _samplesStorage.reverse();
+  }
+
   /// Converts a mono (1 channel) WAV content to stereo (2 channels) by cloning the channel.
   ///
   /// Throws [StateError] if the current content is not mono.

@@ -309,4 +309,30 @@ void main() {
       expect(() => formatStereo.channelMask = KSAUDIO_SPEAKER_7POINT1, throwsArgumentError);
     });
   });
+
+  group('Reversal API Tests', () {
+    test('IWavSamplesStorage.reverse reverses samples in-place', () {
+      final storage = Int16Storage(5, 2);
+      storage.samplesData[0].setAll(0, [1, 2, 3, 4, 5]);
+      storage.samplesData[1].setAll(0, [10, 20, 30, 40, 50]);
+
+      storage.reverse();
+
+      expect(storage.samplesData[0], equals([5, 4, 3, 2, 1]));
+      expect(storage.samplesData[1], equals([50, 40, 30, 20, 10]));
+    });
+
+    test('IWavContent.reverse reverses content in-place', () {
+      final storage = Float32Storage(3, 1);
+      storage.samplesData[0].setAll(0, [0.1, 0.2, 0.3]);
+      final format = WavFormat(1, 44100, 4, 32, 32, FormatType.float32);
+      final wav = WavContent<Float32Storage>(format, StorageType.float32, storage);
+
+      wav.reverse();
+
+      expect(storage.samplesData[0][0], closeTo(0.3, 1e-5));
+      expect(storage.samplesData[0][1], closeTo(0.2, 1e-5));
+      expect(storage.samplesData[0][2], closeTo(0.1, 1e-5));
+    });
+  });
 }

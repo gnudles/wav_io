@@ -55,3 +55,26 @@ Reads a WAV file and prints comprehensive format specifications along with RIFF 
 ```bash
 dart example/lib/info.dart <input.wav>
 ```
+
+---
+
+## 5. Audio Reverser (`reverse.dart`)
+
+Demonstrates how to reverse a WAV audio file from end to start. It reads input blocks backwards using `WavReader`, reverses the samples for each channel, and writes the reversed blocks sequentially using `WavWriter`. This is a memory-efficient way to reverse long audio files.
+
+### Usage
+```bash
+dart example/lib/reverse.dart -i <input.wav> -o <output.wav>
+```
+
+---
+
+## 6. Multi-Channel to Mono Merger (`merge_mono.dart`)
+
+Demonstrates how to merge all audio channels from a WAV file into a single mono track. It reads input chunks using `WavReader`, sums the sample values across all channels, and writes the resulting mono chunks sequentially using `WavWriter`. This is a memory-efficient way to process and mix multi-channel WAV files.
+
+### Usage
+```bash
+dart example/lib/merge_mono.dart -i <input.wav> -o <output.wav>
+```
+

@@ -6,6 +6,7 @@ A high-performance, pure Dart library for reading, writing, streaming, and manip
 
 - **Broad Format Support**: Read and write 8-bit unsigned PCM, 16-bit/24-bit/32-bit signed PCM, and 32-bit/64-bit IEEE floating-point formats.
 - **RIFF & RIFX Support**: Full compatibility with both standard little-endian (RIFF) and big-endian (RIFX) byte orderings.
+- **Streaming Reads**: Use `WavReader` to read audio chunks and seek to arbitrary positions on the fly, keeping memory footprint low.
 - **Streaming Writes**: Use `WavWriter` to stream and write audio chunks to disk sequentially, minimizing memory overhead.
 - **Multichannel & Channel Masks**: Supports speaker layout configurations (mono, stereo, quad, 5.1 surround) using standardized channel mask structures.
 - **Metadata Management**: Access, edit, and write standard LIST INFO fields (e.g., track name, artist, album, genre, year).
@@ -139,7 +140,37 @@ void main() {
 }
 ```
 
-### 4. Format Conversion & Channel Layout Manipulation
+### 4. Streaming Reads with `WavReader`
+
+Read audio samples chunk by chunk or seek to arbitrary positions without loading the entire file into memory:
+
+```dart
+import 'dart:io';
+import 'package:wav_io/wav_io.dart';
+import 'package:wav_io/wav_reader.dart';
+
+void main() {
+  final file = File('input.wav').openSync(mode: FileMode.read);
+  final reader = WavReader(file);
+
+  print("Format: ${reader.format.formatType}");
+  print("Sample Rate: ${reader.format.sampleRate} Hz");
+  print("Total Samples: ${reader.totalSamples}");
+
+  // Seek to 1 second in (at 44.1kHz)
+  reader.seek(44100);
+
+  // Read a block of 1024 sample frames
+  final chunk = reader.read(1024);
+  if (chunk != null) {
+    print("Read ${chunk.length} frames.");
+  }
+
+  reader.close();
+}
+```
+
+### 5. Format Conversion & Channel Layout Manipulation
 
 Convert WAV files dynamically to other representations, such as mixing channels down to mono:
 

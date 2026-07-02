@@ -126,6 +126,9 @@ abstract class IWavSamplesStorage {
   /// the specified endianness and [bytesPerSample].
   void writeStorage(ByteData data, Endian numEndianess, int bytesPerSample);
 
+  /// Reverses the audio samples in-place for all channels.
+  void reverse();
+
   static void _int16ListToFloat32(Int16List list, Float32List out) {
     int length = list.length;
     final double multiplier = 1 / (1 << 15);
@@ -499,6 +502,19 @@ class Uint8Storage extends IWavSamplesStorage {
     }
     return this;
   }
+
+  @override
+  void reverse() {
+    for (int c = 0; c < channels; c++) {
+      final data = samplesData[c];
+      final int len = data.length;
+      for (int i = 0; i < len ~/ 2; i++) {
+        final temp = data[i];
+        data[i] = data[len - 1 - i];
+        data[len - 1 - i] = temp;
+      }
+    }
+  }
 }
 
 /// Storage for audio samples represented as signed 16-bit integers (PCM 16-bit format).
@@ -652,6 +668,19 @@ class Int16Storage extends IWavSamplesStorage {
           samplesData[index], storage.samplesData[index], enableDithering);
     }
     return storage;
+  }
+
+  @override
+  void reverse() {
+    for (int c = 0; c < channels; c++) {
+      final data = samplesData[c];
+      final int len = data.length;
+      for (int i = 0; i < len ~/ 2; i++) {
+        final temp = data[i];
+        data[i] = data[len - 1 - i];
+        data[len - 1 - i] = temp;
+      }
+    }
   }
 }
 
@@ -855,6 +884,19 @@ class Int32Storage extends IWavSamplesStorage {
     }
     return storage;
   }
+
+  @override
+  void reverse() {
+    for (int c = 0; c < channels; c++) {
+      final data = samplesData[c];
+      final int len = data.length;
+      for (int i = 0; i < len ~/ 2; i++) {
+        final temp = data[i];
+        data[i] = data[len - 1 - i];
+        data[len - 1 - i] = temp;
+      }
+    }
+  }
 }
 
 /// Storage for audio samples represented as 64-bit IEEE floating-point numbers.
@@ -1005,6 +1047,19 @@ class Float64Storage extends IWavSamplesStorage {
     }
     return storage;
   }
+
+  @override
+  void reverse() {
+    for (int c = 0; c < channels; c++) {
+      final data = samplesData[c];
+      final int len = data.length;
+      for (int i = 0; i < len ~/ 2; i++) {
+        final temp = data[i];
+        data[i] = data[len - 1 - i];
+        data[len - 1 - i] = temp;
+      }
+    }
+  }
 }
 
 /// Storage for audio samples represented as 32-bit IEEE floating-point numbers.
@@ -1151,6 +1206,19 @@ class Float32Storage extends IWavSamplesStorage {
           samplesData[index], storage.samplesData[index], enableDithering);
     }
     return storage;
+  }
+
+  @override
+  void reverse() {
+    for (int c = 0; c < channels; c++) {
+      final data = samplesData[c];
+      final int len = data.length;
+      for (int i = 0; i < len ~/ 2; i++) {
+        final temp = data[i];
+        data[i] = data[len - 1 - i];
+        data[len - 1 - i] = temp;
+      }
+    }
   }
 }
 
