@@ -39,6 +39,27 @@ const SPEAKER_TOP_BACK_LEFT = 0x8000;
 const SPEAKER_TOP_BACK_CENTER = 0x10000;
 // ignore: constant_identifier_names
 const SPEAKER_TOP_BACK_RIGHT = 0x20000;
+
+/* channel ordering
+1. Front Left - FL
+2. Front Right - FR
+3. Front Center - FC
+4. Low Frequency - LF
+5. Back Left - BL
+6. Back Right - BR
+7. Front Left of Center - FLC
+8. Front Right of Center - FRC
+9. Back Center - BC
+10. Side Left - SL
+11. Side Right - SR
+12. Top Center - TC
+13. Top Front Left - TFL
+14. Top Front Center - TFC
+15. Top Front Right - TFR
+16. Top Back Left - TBL
+17. Top Back Center - TBC
+18. Top Back Right - TBR
+*/
 // ignore: constant_identifier_names
 const KSAUDIO_SPEAKER_DIRECTOUT = 0x0;
 // ignore: constant_identifier_names
@@ -90,26 +111,6 @@ const speakersOrder = [
   SPEAKER_TOP_BACK_RIGHT
 ];
 
-/* channel ordering
-1. Front Left - FL
-2. Front Right - FR
-3. Front Center - FC
-4. Low Frequency - LF
-5. Back Left - BL
-6. Back Right - BR
-7. Front Left of Center - FLC
-8. Front Right of Center - FRC
-9. Back Center - BC
-10. Side Left - SL
-11. Side Right - SR
-12. Top Center - TC
-13. Top Front Left - TFL
-14. Top Front Center - TFC
-15. Top Front Right - TFR
-16. Top Back Left - TBL
-17. Top Back Center - TBC
-18. Top Back Right - TBR
-*/
 int countChannelsInMask(int channelMask) {
   int count = 0;
   for (var x in speakersOrder) {
@@ -141,9 +142,16 @@ List<T> createMappingOfMasks<T>(
 }
 
 class ListInfo {
+  /// Track name
   String name;
+
+  /// Album name
   String product;
+
+  /// Artist name
   String artist;
+
+  /// Year
   String date;
   String comment;
   String genre;
@@ -156,8 +164,8 @@ class ListInfo {
             0,
             (previousValue, element) =>
                 previousValue +
-                (element.isNotEmpty &&
-                        element.codeUnits.every((e) => e > 0 && e <= 127)
+                ((element.isNotEmpty &&
+                        element.codeUnits.every((e) => e > 0 && e <= 127))
                     ? 8 + roundUp2(element.length + 1)
                     : 0));
     if (s > 0) {
@@ -207,7 +215,15 @@ class WavFormat {
   /// The size in bits of sample container
   final int containerBitsPerSample;
   // Samples per second.
-  final int sampleRate;
+  int _sampleRate;
+  int get sampleRate => _sampleRate;
+  set sampleRate(int sampleRate) {
+    if (sampleRate >= 1 && sampleRate < (1 << 31)) {
+      _sampleRate = sampleRate;
+    }
+    throw ArgumentError(
+        "sampleRate do not match the supported range of this library");
+  }
 
   int _channelMask;
   int get channelMask => _channelMask;
@@ -220,7 +236,7 @@ class WavFormat {
   }
 
   final FormatType formatType;
-  WavFormat(this.numChannels, this.sampleRate, this.blockAlign,
+  WavFormat(this.numChannels, this._sampleRate, this.blockAlign,
       this.validBitsPerSample, this.containerBitsPerSample, this.formatType,
       {int channelMask = 0})
       : _channelMask = channelMask;
@@ -232,7 +248,10 @@ abstract class IWavContent {
 
   /// Number of channels
   int get numChannels => format.numChannels;
-  int get sampleRate => format.sampleRate;
+  int get sampleRate => format._sampleRate;
+
+  /// The channelMask tells for every channel its assigned speaker position.
+  int get channelMask => format._channelMask;
   int get bitsPerSample => format.containerBitsPerSample;
 
   ///Returns the duration of the Wav in seconds.
@@ -241,11 +260,17 @@ abstract class IWavContent {
   final WavFormat _format;
   WavFormat get format => _format;
   final StorageType storageType;
+
+  /// stores data of the LIST INFO subchunk
   final ListInfo? info;
   final IWavSamplesStorage _samplesStorage;
   IWavContent(this._format, this.storageType, this._samplesStorage,
       {this.info});
   IWavContent _cloneWith(IWavSamplesStorage? samplesStorage, WavFormat? format);
+
+  void setSampleRate(int sampleRate) {
+    format.sampleRate = sampleRate;
+  }
 
   IWavContent monoToStereo() {
     if (numChannels != 1) {
@@ -351,6 +376,7 @@ abstract class IWavContent {
   bool get isMono => numChannels == 1;
   bool get isStereo => numChannels == 2;
 
+  /// Writes the samples data in raw format
   void exportStorageAsBytes(ByteData data, Endian numEndianess) {
     _samplesStorage.writeStorage(
         data, numEndianess, format.containerBitsPerSample ~/ 8);

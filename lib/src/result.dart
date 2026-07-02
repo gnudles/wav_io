@@ -27,7 +27,8 @@ class Result<V, E> {
   }
 
   E? get error {
-    if (_kind != ResultKind.error) throw UnsupportedError("Result is not Error");
+    if (_kind != ResultKind.error)
+      throw UnsupportedError("Result is not Error");
     return _error;
   }
 }

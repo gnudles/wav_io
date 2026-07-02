@@ -22,6 +22,9 @@ Each channel is packed as Int16List/Int32List/Float32List/Float64List.
 * Can read/write 32bit/64bit float files.
 * Can read/write RIFX format (big endian version)
 * Can be used to write wav utilities.
+* Supports the extended format and channel masks.
+* Supports INFO list (fields like artist, track name, album etc...)
+* Supports Triangular Dither (TPDF)
 
 ## Getting started
 

@@ -295,17 +295,20 @@ Result<IWavContent, WavParsingError> loadWav(ByteData data) {
 
 FormatType recommandedFormatType(int wFormatTag, int bitsPerSample) {
   if (wFormatTag == WAVE_FORMAT_PCM) {
-    if (bitsPerSample == 8) {
+    if (bitsPerSample <= 8) {
       return FormatType.pcm8;
-    } else if (bitsPerSample == 24) {
+    } else if (bitsPerSample <= 16) {
+      return FormatType.pcm16;
+    } else if (bitsPerSample <= 24) {
       return FormatType.pcm24;
-    } else if (bitsPerSample == 32) {
+    } else /* bitsPerSample <= 32 */ {
       return FormatType.pcm32;
     }
-    return FormatType.pcm16;
-  }
-  if (bitsPerSample <= 32) {
-    return FormatType.float32;
+  } else if (wFormatTag == WAVE_FORMAT_IEEE_FLOAT) {
+    if (bitsPerSample <= 32) {
+      return FormatType.float32;
+    }
+    return FormatType.float64;
   }
   return FormatType.float64;
 }
@@ -356,20 +359,12 @@ Result<WavFormat, WavParsingError> parseFmt(
 
   int bitsPerSample = data.getUint16(14, numEndianess);
   int validBitsPerSample = bitsPerSample;
-  if (bitsPerSample == 0 || bitsPerSample > 64)
-  {
+  if (bitsPerSample == 0 || bitsPerSample > 64) {
     return Result.error(WavParsingError.invalidBitsPerSample);
-  }
-  if (bitsPerSample < 8)
-  {
-    return Result.error(WavParsingError.unsupportedBitsPerSample);
   }
   int bytesPerSample = blockAlign ~/ numChannels;
   int bytesPerSampleUp = (bitsPerSample + 7) ~/ 8;
-  if (blockAlign % numChannels != 0) {
-    return Result.error(WavParsingError.invalidBlockAlign);
-  }
-  if (bytesPerSample != bytesPerSampleUp) {
+  if (blockAlign % numChannels != 0 || bytesPerSample != bytesPerSampleUp) {
     return Result.error(WavParsingError.invalidBlockAlign);
   }
   if (byteRate != blockAlign * sampleRate) {
@@ -416,7 +411,8 @@ Result<WavFormat, WavParsingError> parseFmt(
 
 Result<IWavSamplesStorage, WavParsingError> parseDataChunk(
     ByteData data, Endian numEndianess, WavFormat wavFormat) {
-  if (data.lengthInBytes == 0 || data.lengthInBytes % wavFormat.blockAlign != 0) {
+  if (data.lengthInBytes == 0 ||
+      data.lengthInBytes % wavFormat.blockAlign != 0) {
     return Result.error(WavParsingError.invalidDataChunkSize);
   }
   if (wavFormat.formatType == FormatType.pcm8 &&
@@ -484,6 +480,10 @@ Result<ListInfo, WavParsingError> parseListChunk(
       infoEntries[ITRK_ID] ?? ""));
 }
 
+/// Takes the wav content and convert it to ByteData.
+/// The extensible flag tells whether to use the extended Fmt subchunk,
+/// (defaults to true). This extended format is important because it stores the
+/// integer of channel mask.
 ByteData saveWav(IWavContent wavContent,
     [bool extensible = true, bool bigEndian = false]) {
   int dataCkSize = wavContent.format.blockAlign * wavContent.numSamples;
@@ -557,6 +557,7 @@ void writeFmt(ByteData data, bool extensible, WavFormat format,
         ? WAVE_FORMAT_IEEE_FLOAT
         : WAVE_FORMAT_PCM;
   }
+
   data.setUint16(0, wFormatTag, numEndianess);
   data.setUint16(2, format.numChannels, numEndianess);
   data.setUint32(4, format.sampleRate, numEndianess);
