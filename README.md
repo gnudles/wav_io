@@ -198,5 +198,5 @@ void main() {
 
 ## Additional Information
 
-Find more detailed integration scripts in the [example directory](file:///home/orr/Projects/wav_io/wav_io/example).
+Find more detailed integration scripts in the example directory.
 If you have questions, run into issues, or want to contribute, feel free to open a pull request or file an issue on the [GitHub repository](https://github.com/gnudles/wav_io).
