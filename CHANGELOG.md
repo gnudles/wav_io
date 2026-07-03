@@ -28,4 +28,8 @@
 
 ## 3.0.1
 
-- Removed generated audio file
+- Removed generated audio file.
+
+## 3.0.2
+
+- Fixed link in the README.md file.
